@@ -1,8 +1,10 @@
 /* Copyright (C) 2016+ AzerothCore, GNU AGPL v3. */
+#include "DBCStores.h"
 #include "Player.h"
 #include "ScriptMgr.h"
 #include "SpellAuras.h"
 #include "SpellScript.h"
+#include "SpellInfo.h"
 
 namespace
 {
@@ -73,10 +75,36 @@ public:
     }
 };
 
+class bloodmage_talent_contracts : public GlobalScript
+{
+public:
+    bloodmage_talent_contracts() : GlobalScript("bloodmage_talent_contracts",
+        {GLOBALHOOK_ON_LOAD_SPELL_CUSTOM_ATTR}) { }
+
+    void OnLoadSpellCustomAttr(SpellInfo* info) override
+    {
+        if (!info || info->Id != SPELL_VAMPIRIC_POOLS_LEECH || info->SpellFamilyName != 26 ||
+            info->Effects[EFFECT_0].Effect != SPELL_EFFECT_HEALTH_LEECH)
+            return;
+
+        // Vampiric Pools leeches and fears the same nearby targets when Liquify ends.
+        // Keep the existing leech amount/coefficient and native damage-break proc data.
+        info->DurationEntry = sSpellDurationStore.LookupEntry(32); // Six seconds.
+        info->AttributesCu |= SPELL_ATTR0_CU_NEGATIVE_EFF1;
+        auto& fear = info->Effects[EFFECT_1];
+        fear.Effect = SPELL_EFFECT_APPLY_AURA;
+        fear.ApplyAuraName = SPELL_AURA_MOD_FEAR;
+        fear.Mechanic = MECHANIC_FEAR;
+        fear.TargetA = info->Effects[EFFECT_0].TargetA;
+        fear.TargetB = info->Effects[EFFECT_0].TargetB;
+        fear.RadiusEntry = info->Effects[EFFECT_0].RadiusEntry;
+    }
+};
 }
 
 void AddSC_AscensionBloodmageTalents()
 {
     new bloodmage_talent_events();
+    new bloodmage_talent_contracts();
     RegisterSpellScript(spell_ascension_animated_blood);
 }
