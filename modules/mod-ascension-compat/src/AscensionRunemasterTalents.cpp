@@ -32,6 +32,18 @@ void SyncStonePetroglyph(Player* player)
         player->CastSpell(player, 712310, true);
 }
 
+// Palm Sigil (805380/805381/805382) gates its cast on CasterAuraSpell 808089, a marker spell
+// literally named "Runeshroud or Waveforged" that nothing else ever grants, making it permanently
+// uncastable. Mirror the real Runeshroud/Waveforged state onto it instead.
+void SyncRuneshroudOrWaveforged(Player* player)
+{
+    bool active = player->HasAura(500288, player->GetGUID()) || player->HasAura(705565, player->GetGUID());
+    if (!active)
+        player->RemoveAurasDueToSpell(808089, player->GetGUID());
+    else if (!player->HasAura(808089, player->GetGUID()))
+        player->CastSpell(player, 808089, true);
+}
+
 class runemaster_talent_events : public UnitScript
 {
 public:
@@ -46,6 +58,8 @@ public:
         uint32 id = aura->GetId();
         if (id == 707157 || id == 712310 || IsEarthTattoo(id))
             SyncStonePetroglyph(player);
+        if (id == 500288 || id == 705565)
+            SyncRuneshroudOrWaveforged(player);
     }
 
     void OnAuraRemove(Unit* unit, AuraApplication* application, AuraRemoveMode mode) override
@@ -60,6 +74,8 @@ public:
         if (id == 500288 && aura->GetCasterGUID() == player->GetGUID() && mode != AURA_REMOVE_BY_DEATH &&
             player->IsAlive() && player->IsInWorld() && player->HasAura(520054))
             player->CastSpell(player, 520768, true);
+        if (id == 500288 || id == 705565)
+            SyncRuneshroudOrWaveforged(player);
     }
 };
 }
