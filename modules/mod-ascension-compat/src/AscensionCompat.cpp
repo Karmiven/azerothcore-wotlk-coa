@@ -779,6 +779,17 @@ public:
         player->SetSkill(definition.SkillId, 0, 0, 0);
     }
 
+    // Defense and Unarmed are intrinsic combat skills, absent from the equipment proficiency catalog.
+    // Keep their current value and cap in step with the weapon skills on login and every level change.
+    for (uint16 skill : std::array<uint16, 2>{SKILL_DEFENSE, SKILL_UNARMED})
+      if (player->HasSkill(skill))
+      {
+        uint16 const maximum = player->GetMaxSkillValueForLevel();
+        player->SetSkill(skill, player->GetSkillStep(skill), maximum, maximum);
+        if (skill == SKILL_DEFENSE)
+          player->UpdateDefenseBonusesMod();
+      }
+
     _proficiencySynchronizations.erase(guid);
     if (learned || removed)
     {
