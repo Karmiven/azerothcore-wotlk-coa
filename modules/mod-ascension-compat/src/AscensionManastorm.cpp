@@ -1667,8 +1667,14 @@ namespace
             uint32 const instanceId = run.encounter->instanceId;
             uint32 const depth = run.encounter->depth;
             // Snapshot XP bonuses before saving the reward; delivery may happen after the buffs expire.
+            bool const recruitAFriend = player->GetsRecruitAFriendBonus(true);
+            float const xpMultiplier = player->GetTotalAuraMultiplier(SPELL_AURA_MOD_XP_PCT,
+                [recruitAFriend](AuraEffect const* effect)
+                {
+                    return effect->GetId() != 818059 || !recruitAFriend;
+                });
             uint32 const xp = mode < 4 ? uint32(sObjectMgr->GetXPForLevel(player->GetLevel()) *
-                (first ? 0.075f : 0.06f) * player->GetTotalAuraMultiplier(SPELL_AURA_MOD_XP_PCT)) : 0;
+                (first ? 0.075f : 0.06f) * xpMultiplier) : 0;
             uint64 const token = run.token;
             if (xp)
             {

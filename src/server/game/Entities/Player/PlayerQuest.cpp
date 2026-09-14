@@ -1491,7 +1491,12 @@ uint32 Player::CalculateQuestRewardXP(Quest const* quest)
     uint32 xp = uint32(quest->XPValue(level) * GetQuestRate(quest->IsDFQuest()));
 
     // handle SPELL_AURA_MOD_XP_QUEST_PCT auras
-    xp *= GetTotalAuraMultiplier(SPELL_AURA_MOD_XP_QUEST_PCT);
+    bool const recruitAFriend = GetsRecruitAFriendBonus(true);
+    xp *= GetTotalAuraMultiplier(SPELL_AURA_MOD_XP_QUEST_PCT, [recruitAFriend](AuraEffect const* effect)
+    {
+        // CoA's party Aura of Experience explicitly excludes the recruit-a-friend bonus.
+        return effect->GetId() != 818059 || !recruitAFriend;
+    });
 
     return xp;
 }

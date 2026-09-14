@@ -3867,6 +3867,47 @@ public:
   }
 };
 
+void ApplyAscensionExperienceContracts(SpellInfo* info)
+{
+    if (!info)
+        return;
+
+    switch (info->Id)
+    {
+        case 57353: // Heirloom Experience Bonus +10%
+        case 71354:
+        case 157353: // Heirloom Experience Bonus +20%
+        case 818046: // Potion of Experience
+        case 819046:
+            // Copied source tags 2/8 select quest XP. Native aura 200 only modifies kill XP.
+            for (SpellEffectInfo& effect : info->Effects)
+                if (effect.ApplyAuraName == SPELL_AURA_MOD_XP_PCT &&
+                    (effect.MiscValue == 2 || effect.MiscValue == 8))
+                    effect.ApplyAuraName = SPELL_AURA_MOD_XP_QUEST_PCT;
+            break;
+        case 818059: // Aura of Experience: 50% for kills and quests, shared with the party.
+        {
+            SpellEffectInfo& kills = info->Effects[EFFECT_1];
+            SpellEffectInfo& quests = info->Effects[EFFECT_2];
+            if (kills.Effect != SPELL_EFFECT_APPLY_AREA_AURA_PARTY ||
+                kills.ApplyAuraName != SPELL_AURA_MOD_XP_PCT || kills.MiscValue != 63 || quests.Effect)
+                break;
+            kills.BasePoints = 49;
+            kills.DieSides = 1;
+            quests.Effect = kills.Effect;
+            quests.ApplyAuraName = SPELL_AURA_MOD_XP_QUEST_PCT;
+            quests.BasePoints = kills.BasePoints;
+            quests.DieSides = kills.DieSides;
+            quests.TargetA = kills.TargetA;
+            quests.TargetB = kills.TargetB;
+            quests.RadiusEntry = kills.RadiusEntry;
+            break;
+        }
+        default:
+            break;
+    }
+}
+
 class AscensionCompatChangelogScript : public GlobalScript
 {
 public:
@@ -3878,6 +3919,7 @@ public:
         if (ascensionCompatConfig.GetConfigValue<bool>(AscensionCompatConfig::ENABLED))
         {
             ApplyAscensionChangelogSpellChanges(spellInfo);
+            ApplyAscensionExperienceContracts(spellInfo);
             ApplyAscensionClassMechanics(spellInfo);
             ApplyAscensionPrimalistEarthshapingContracts(spellInfo);
             ApplyAscensionPrimalistSpiritBeastContract(spellInfo);
