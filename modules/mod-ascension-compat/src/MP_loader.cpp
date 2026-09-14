@@ -15,6 +15,7 @@
 #include "AscensionTinkerCombatSymbiosis.h"
 
 void AddAscensionCompatScripts();
+void AddAscensionTravelPermitScripts();
 void AddCoABugReportScripts();
 void AddAscensionBarbarianCompletionScripts();
 void AddAscensionBarbarianEventScripts();
@@ -143,6 +144,7 @@ void Addmod_ascension_compatScripts()
     AddSC_AscensionReaperDirge();
     AddAscensionTinkerOverloadScripts();
     AddAscensionCompatScripts();
+    AddAscensionTravelPermitScripts();
     AddAscensionBarbarianCompletionScripts();
     AddAscensionBarbarianEventScripts();
     AddAscensionBarbarianAbilityScripts();
