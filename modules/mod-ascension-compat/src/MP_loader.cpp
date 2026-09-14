@@ -128,6 +128,8 @@ void AddSC_AscensionRangerFlowers();
 void AddSC_AscensionRangerPetalkeeper();
 void AddSC_AscensionRangerFalconstrike();
 void AddSC_AscensionChronomancerTalents();
+void AddSC_AscensionChronomancerTime();
+void AddSC_AscensionChronomancerMovement();
 void AddSC_AscensionBloodmageTalents();
 void AddSC_AscensionBloodmageVitality();
 void AddSC_AscensionReaperReflexes();
@@ -260,6 +262,8 @@ void Addmod_ascension_compatScripts()
     AddSC_AscensionRangerPetalkeeper();
     AddSC_AscensionRangerFalconstrike();
     AddSC_AscensionChronomancerTalents();
+    AddSC_AscensionChronomancerTime();
+    AddSC_AscensionChronomancerMovement();
     AddSC_AscensionBloodmageTalents();
     AddSC_AscensionBloodmageVitality();
     AddSC_AscensionReaperReflexes();
