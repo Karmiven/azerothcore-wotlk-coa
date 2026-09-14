@@ -294,6 +294,12 @@ class xoroth_scaling : public UnitScript
             player = Owner(caster->GetOwner());
         if (!player || !info)
             return;
+        if (info->Id == 630930 && index == EFFECT_0 && caster->GetEntry() == 510100)
+        {
+            // Burning Slap: copied SpellDescriptionVariables row 182 ($scalingbp), then AP/SP bonuses.
+            double level = caster->GetLevel();
+            value *= float(0.0267291844060354 + 0.0048541098014737 * level + 0.0001859597762293 * level * level);
+        }
         for (auto const& row : XorothCoefficients)
             if (row.spell == info->Id && row.effect == index)
             {

@@ -207,8 +207,14 @@ void Refresh(Player* player)
     {
         if (!pet->HasAura(520662))
             Cast(player, pet, 520662);
+        // Firebolt is the free triggered attack of temporary Hellfire Imps, not a permanent pet ability.
+        if (pet->HasSpell(800444))
+        {
+            pet->ToggleAutocast(sSpellMgr->GetSpellInfo(800444), false);
+            pet->removeSpell(800444, false);
+        }
         bool learned = false;
-        for (uint32 id : {800444, 630931})
+        for (uint32 id : {630930, 630931})
             if (!pet->HasSpell(id))
             {
                 pet->learnSpell(id);
