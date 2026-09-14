@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 import re
+import runpy
 import subprocess
 import tempfile
 
@@ -11,6 +12,9 @@ ROOT = Path(__file__).resolve().parents[4]
 def main():
     source = (ROOT / 'modules/mod-ascension-compat/src/AscensionChronomancerMovement.cpp').read_text()
     source = re.sub(r'^#include.*\n', '', source, flags=re.M)
+    method = runpy.run_path(str(ROOT / 'modules/mod-ascension-compat/tests/client_compat/run.py'))['method']
+    follow = method((ROOT / 'src/server/game/Movement/MotionMaster.cpp').read_text(),
+                    'void MotionMaster::MoveFollow(')
     code = r'''
 #include <algorithm>
 #include <array>
@@ -24,7 +28,8 @@ using SpellEffIndex=int;using AuraEffectHandleModes=int;
 enum SpellCastResult {SPELL_CAST_OK,SPELL_FAILED_CANT_DO_THAT_RIGHT_NOW};
 enum {CLASS_CHRONOMANCER=22,POWER_MANA=0,REACT_PASSIVE=0,EFFECT_0=0,EFFECT_1=1,
     SPELL_EFFECT_DUMMY=3,SPELL_AURA_DUMMY=4,AURA_REMOVE_BY_EXPIRE=1,AURA_REMOVE_BY_ENEMY_SPELL=2,
-    AURA_EFFECT_HANDLE_REAL=1,AURA_EFFECT_HANDLE_REAL_OR_REAPPLY_MASK=3,GLOBALHOOK_ON_LOAD_SPELL_CUSTOM_ATTR=1};
+    AURA_EFFECT_HANDLE_REAL=1,AURA_EFFECT_HANDLE_REAL_OR_REAPPLY_MASK=3,GLOBALHOOK_ON_LOAD_SPELL_CUSTOM_ATTR=1,
+    UNIT_FLAG_DISABLE_MOVE=4};
 struct Position {float x=0;};
 struct SpellInfo
 {
@@ -38,6 +43,8 @@ struct Unit
     uint32 guid=1,hp=900,maxHP=1000,mp=400,maxMP=500,mapId=1,instanceId=1;
     bool alive=true,world=true,transport=false,vehicle=false,flight=false,phase=true;
     Position pos;std::vector<uint32> casts;std::vector<float> castPositions;
+    uint32 unitFlags=0;
+    void SetUnitFlag(uint32 flag){unitFlags|=flag;}bool HasUnitFlag(uint32 flag)const{return (unitFlags&flag)!=0;}
     bool IsPlayer(){return ToPlayer()!=nullptr;}bool IsAlive()const{return alive;}bool IsInWorld()const{return world;}
     bool GetTransport()const{return transport;}bool GetVehicle()const{return vehicle;}
     bool IsInFlight()const{return flight;}
@@ -99,13 +106,28 @@ struct GlobalScript
 #define AuraEffectRemoveFn(...) 0
 #define RegisterCreatureAI(...)
 #define RegisterSpellScript(...)
-''' + source + r'''
+using MovementSlot=int;
+template<class T> struct FollowMovementGenerator
+{FollowMovementGenerator(Unit*,float,float,bool,bool){}};
+struct MotionMaster
+{
+    Unit* _owner;bool following=false;
+    template<class T> void Mutate(T* generator,int){following=true;delete generator;}
+    void MoveFollow(Unit*,float,float,MovementSlot,bool,bool);
+};
+#define LOG_DEBUG(...)
+''' + follow + source + r'''
 int main()
 {
     Player player;player.pos.x=10;Creature clone,old;
     npc_ascension_infinite_clone ai(&clone),oldAI(&old);clone.ai=&ai;old.ai=&oldAI;
     player.minions={&old,&clone};ai.IsSummonedBy(&player);
     assert(ai.recorded && !old.world && clone.reaction==REACT_PASSIVE && player.casts.back()==45204);
+    // This native call happens after IsSummonedBy in Spell::SummonGuardian.
+    MotionMaster cloneMotion{&clone};cloneMotion.MoveFollow(&player,1,0,0,false,false);
+    assert(!cloneMotion.following);
+    Creature ordinary;MotionMaster ordinaryMotion{&ordinary};
+    ordinaryMotion.MoveFollow(&player,1,0,0,false,false);assert(ordinaryMotion.following);
     spell_ascension_rewind rewind;rewind.caster=&player;
     assert(rewind.CheckClone()==SPELL_CAST_OK);
     player.transport=true;assert(rewind.CheckClone()!=SPELL_CAST_OK);player.transport=false;

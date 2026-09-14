@@ -47,6 +47,8 @@ struct npc_ascension_infinite_clone : ScriptedAI
         mana = player->GetPower(POWER_MANA);
         recorded = true;
         me->SetReactState(REACT_PASSIVE);
+        // SummonGuardian requests MoveFollow after this callback; its native guard honors this flag.
+        me->SetUnitFlag(UNIT_FLAG_DISABLE_MOVE);
         player->CastSpell(me, CloneAppearance, true);
 
         std::list<Creature*> previous;
