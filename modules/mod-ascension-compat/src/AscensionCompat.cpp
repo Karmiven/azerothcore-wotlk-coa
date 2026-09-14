@@ -122,8 +122,11 @@ constexpr char ASCENSION_ACTIVE_SPEC_SETTING[] = "core.ascension_active_spec";
 enum CompanionLoot : uint32
 {
     APPEARANCE_CATEGORY_COMPANION_LOOT = 38,
+    APPEARANCE_CATEGORY_COMPANION_SKINNING = 61,
     APPEARANCE_LOOT_TRANSFIGURATOR = 47520,
-    SPELL_LOOT_TRANSFIGURATOR = 84419
+    APPEARANCE_SKIN_PEELER = 639807,
+    SPELL_LOOT_TRANSFIGURATOR = 84419,
+    SPELL_SKIN_PEELER = 92864
 };
 
 constexpr uint8 PYROMANCER_HEAT_PER_EMBER = 100;
@@ -258,6 +261,7 @@ struct PlayerCollectionState {
   std::size_t NextCompanionSpell = 0;
   uint32 CompanionSpellTimer = 0;
   uint32 CompanionLootTimer = 0;
+  uint32 CompanionSkinningTimer = 0;
   bool CanSeeItemAppearances = true;
   bool CanSeeSpellAppearances = true;
 };
@@ -2304,23 +2308,27 @@ public:
     ProcessPendingAppearanceAdds(player, diff);
     ProcessPendingCompanionSpells(player, diff);
     ProcessCompanionLoot(player, diff);
+    ProcessCompanionLoot(player, diff, true);
   }
 
-    void ProcessCompanionLoot(Player* player, uint32 diff)
+    void ProcessCompanionLoot(Player* player, uint32 diff, bool skin = false)
     {
+        uint32 const category = skin ? APPEARANCE_CATEGORY_COMPANION_SKINNING : APPEARANCE_CATEGORY_COMPANION_LOOT;
+        uint32 const appearance = skin ? APPEARANCE_SKIN_PEELER : APPEARANCE_LOOT_TRANSFIGURATOR;
         auto state = GetState(player);
-        if (!state || state->ActiveAppearances[APPEARANCE_CATEGORY_COMPANION_LOOT] !=
-            APPEARANCE_LOOT_TRANSFIGURATOR || !state->CollectedAppearances.contains(APPEARANCE_LOOT_TRANSFIGURATOR))
+        if (!state || state->ActiveAppearances[category] != appearance ||
+            !state->CollectedAppearances.contains(appearance))
             return;
-        if (state->CompanionLootTimer > diff)
+        uint32& timer = skin ? state->CompanionSkinningTimer : state->CompanionLootTimer;
+        if (timer > diff)
         {
-            state->CompanionLootTimer -= diff;
+            timer -= diff;
             return;
         }
-        SpellInfo const* spell = sSpellMgr->GetSpellInfo(SPELL_LOOT_TRANSFIGURATOR);
+        SpellInfo const* spell = sSpellMgr->GetSpellInfo(skin ? SPELL_SKIN_PEELER : SPELL_LOOT_TRANSFIGURATOR);
         if (!spell || !spell->Effects[EFFECT_0].Amplitude)
             return;
-        state->CompanionLootTimer = spell->Effects[EFFECT_0].Amplitude;
+        timer = spell->Effects[EFFECT_0].Amplitude;
         Creature* companion = player->GetMap()->GetCreature(player->GetCritterGUID());
         if (!companion || !companion->IsAlive() || companion->GetOwnerGUID() != player->GetGUID())
             return;
@@ -2330,7 +2338,7 @@ public:
         std::list<Creature*> corpses;
         companion->GetDeadCreatureListInGrid(corpses, radius, true);
         for (Creature* creature : corpses)
-            player->LootCreatureWithCompanion(creature, radius);
+            player->LootCreatureWithCompanion(creature, radius, skin);
     }
 
     void InitializeRiding(Player* player) const

@@ -52,7 +52,7 @@ enum SpellCastResult {SPELL_CAST_OK,SPELL_FAILED_OUT_OF_RANGE,SPELL_FAILED_TOO_C
     SPELL_FAILED_UNIT_NOT_INFRONT};
 enum {SPELL_DAMAGE_CLASS_NONE=0,SPELL_DAMAGE_CLASS_MAGIC=1,SPELL_DAMAGE_CLASS_MELEE=2,
     SPELL_DAMAGE_CLASS_RANGED=3,SPELL_RANGE_MELEE=1,SPELL_RANGE_RANGED=2,EFFECT_0=0,MAX_SPELL_EFFECTS=3,
-    SPELL_EFFECT_DISPEL=38,SPELL_EFFECT_SCHOOL_DAMAGE=2,SPELL_AURA_PERIODIC_DAMAGE=3,
+    SPELL_EFFECT_DISPEL=38,SPELL_EFFECT_SCHOOL_DAMAGE=2,SPELL_EFFECT_SKINNING=95,SPELL_AURA_PERIODIC_DAMAGE=3,
     SPELL_AURA_CONTROL_VEHICLE=236,SPELL_AURA_REFLECT_SPELLS=28,SPELL_AURA_REFLECT_SPELLS_SCHOOL=74,
     SPELL_FACING_FLAG_INFRONT=1,SPELL_ATTR3_ALWAYS_HIT=1,SPELL_ATTR0_CU_IGNORE_EVADE=2,
     SPELL_ATTR1_AURA_STAYS_AFTER_COMBAT=3,SPELL_FLESH_HOOK_PULL=800605,SPELL_RANGE_THIRTY_YARDS=4};
@@ -69,7 +69,9 @@ struct SpellInfo
     uint32 Id=800605,DmgClass=2,SpellFamilyName=23,FacingCasterFlags=0,Mechanic=6;
     Range const* RangeEntry=nullptr;std::array<EffectSlot,3> Effects{};
     bool HasAttribute(uint32)const{return false;}
-    bool IsPositive()const{return false;}bool HasEffect(uint32)const{return false;}
+    bool IsPositive()const{return false;}
+    bool HasEffect(uint32 id)const
+    {return std::any_of(Effects.begin(),Effects.end(),[id](auto const& e){return e.Effect==id;});}
     bool HasAura(uint32)const{return false;}uint32 GetSchoolMask()const{return 1;}
 };
 struct Player;
@@ -84,7 +86,7 @@ struct Unit
     SpellMissInfo MeleeSpellHitResult(Unit*,SpellInfo const*) {++meleeRolls;return SPELL_MISS_DODGE;}
     SpellMissInfo MagicSpellHitResult(Unit*,SpellInfo const*) {return SPELL_MISS_MISS;}
     SpellMissInfo SpellHitResult(Unit*,SpellInfo const*,bool);
-    bool IsPlayer()const{return true;}Player* ToPlayer(){return nullptr;}
+    bool IsPlayer()const{return true;}virtual Player* ToPlayer(){return nullptr;}
     Unit* GetSpellModOwner(){return nullptr;}void ApplySpellMod(uint32,uint32,float&,void*){}
     float GetSpellMaxRangeForTarget(Unit*,SpellInfo const* info)const{return info->RangeEntry->maximum;}
     float GetSpellMinRangeForTarget(Unit*,SpellInfo const* info)const{return info->RangeEntry->minimum;}
@@ -99,7 +101,13 @@ struct Unit
     bool IsWithinDist3d(float const* point,float range)const{return std::abs(x-*point)<=range;}
     float GetLeewayBonusRadius()const{return 0;}
 };
-struct Player:Unit {};
+struct Player:Unit
+{
+    Unit* scopedTarget=nullptr;
+    Player* ToPlayer()override{return this;}
+    bool IsWithinLootDistance(Unit* target)const
+    {return std::abs(x-target->x)<=5 || target==scopedTarget;}
+};
 struct GameObject {bool IsAtInteractDistance(Player*,SpellInfo const*)const{return true;}};
 struct Targets
 {
@@ -112,6 +120,7 @@ constexpr uint32 SPELLMOD_RANGE=0;
 struct Spell
 {
     int m_casttime=0;Unit* m_caster;SpellInfo const* m_spellInfo;Targets m_targets;
+    bool triggered=false;bool IsTriggered()const{return triggered;}
     Unit* GetCaster(){return m_caster;}SpellCastResult CheckRange(bool);
 };
 '''
@@ -139,6 +148,16 @@ int main()
     target.immune=false;target.evading=true;
     assert(caster.SpellHitResult(&target,&pull,false)==SPELL_MISS_EVADE);
     target.evading=false;
+    {
+        Player gatherer;Range skinRange{2,0,5};SpellInfo skin;
+        skin.RangeEntry=&skinRange;skin.Effects[0].Effect=SPELL_EFFECT_SKINNING;
+        Spell skinCast{0,&gatherer,&skin,{&target}};skinCast.triggered=true;
+        target.x=20;assert(skinCast.CheckRange(true)==SPELL_FAILED_OUT_OF_RANGE);
+        gatherer.scopedTarget=&target;assert(skinCast.CheckRange(true)==SPELL_CAST_OK);
+        skinCast.triggered=false;assert(skinCast.CheckRange(true)==SPELL_FAILED_OUT_OF_RANGE);
+        skinCast.triggered=true;gatherer.scopedTarget=nullptr;
+        assert(skinCast.CheckRange(true)==SPELL_FAILED_OUT_OF_RANGE);
+    }
     for (uint32 id:{500020u,501488u,501489u,501490u})
     {
         SpellInfo parent;parent.Id=id;parent.DmgClass=SPELL_DAMAGE_CLASS_MAGIC;parent.RangeEntry=&original;

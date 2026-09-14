@@ -8032,11 +8032,22 @@ bool Player::IsWithinLootDistance(Creature const* creature) const
         creature->GetGUID() == m_companionLootGuid);
 }
 
-void Player::LootCreatureWithCompanion(Creature* creature, float radius)
+void Player::LootCreatureWithCompanion(Creature* creature, float radius, bool skin)
 {
+    constexpr uint32 SPELL_SKINNING = 8613;
     if (!IsAlive() || !IsInWorld() || GetLootGUID() || m_companionLootGuid || radius <= 0.0f ||
-        HasPlayerFlag(PLAYER_FLAGS_NO_PLAY_TIME) || !creature || !isAllowedToLoot(creature) ||
-        creature->loot.loot_type == LOOT_SKINNING)
+        HasPlayerFlag(PLAYER_FLAGS_NO_PLAY_TIME) || !creature || creature->IsAlive())
+        return;
+
+    if (skin)
+    {
+        if (!HasSkill(SKILL_SKINNING) || !HasSpell(SPELL_SKINNING) ||
+            creature->GetCreatureTemplate()->GetRequiredLootSkill() != SKILL_SKINNING)
+            return;
+        if (creature->loot.loot_type == LOOT_SKINNING && creature->GetLootRecipientGUID() != GetGUID())
+            return;
+    }
+    else if (!isAllowedToLoot(creature) || creature->loot.loot_type == LOOT_SKINNING)
         return;
 
     Creature* companion = GetMap()->GetCreature(GetCritterGUID());
@@ -8053,7 +8064,10 @@ void Player::LootCreatureWithCompanion(Creature* creature, float radius)
         ObjectGuid& Guid;
         ~LootScope() { Guid.Clear(); }
     } scope{m_companionLootGuid};
-    SendLoot(creature->GetGUID(), LOOT_CORPSE);
+    if (skin && creature->loot.loot_type != LOOT_SKINNING)
+        CastSpell(creature, SPELL_SKINNING, true); // Native skill, corpse, tool and gathering checks.
+    else
+        SendLoot(creature->GetGUID(), skin ? LOOT_SKINNING : LOOT_CORPSE);
 }
 
 void Player::SendLoot(ObjectGuid guid, LootType loot_type)

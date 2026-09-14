@@ -7145,6 +7145,14 @@ bool Spell::CanAutoCast(Unit* target)
 
 SpellCastResult Spell::CheckRange(bool strict)
 {
+    // A companion's synchronous skinning cast uses the same scoped reach as its loot collection.
+    // Spell admission still performs the native skinning/corpse/skill checks below CheckRange.
+    if (IsTriggered() && m_spellInfo->HasEffect(SPELL_EFFECT_SKINNING))
+        if (Player* player = m_caster->ToPlayer())
+            if (Unit* target = m_targets.GetUnitTarget(); target && target->IsCreature() &&
+                player->IsWithinLootDistance(target->ToCreature()))
+                return SPELL_CAST_OK;
+
     // Don't check for instant cast spells
     if (!strict && m_casttime == 0)
         return SPELL_CAST_OK;

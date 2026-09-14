@@ -2331,7 +2331,7 @@ public:
     std::vector<ItemSetEffect*> ItemSetEff;
 
     void SendLoot(ObjectGuid guid, LootType loot_type);
-    void LootCreatureWithCompanion(Creature* creature, float radius);
+    void LootCreatureWithCompanion(Creature* creature, float radius, bool skin = false);
     bool IsWithinLootDistance(Creature const* creature) const;
     void SendLootError(ObjectGuid guid, LootError error);
     void SendLootRelease(ObjectGuid guid);

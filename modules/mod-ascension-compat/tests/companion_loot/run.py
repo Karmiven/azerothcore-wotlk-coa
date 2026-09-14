@@ -16,6 +16,8 @@ def main():
     loot = (ROOT / 'src/server/game/Loot/LootMgr.cpp').read_text(encoding='utf-8')
     header = (ROOT / 'src/server/game/Loot/LootMgr.h').read_text(encoding='utf-8')
     compat = (ROOT / 'modules/mod-ascension-compat/src/AscensionCompat.cpp').read_text(encoding='utf-8')
+    spell = (ROOT / 'src/server/game/Spells/Spell.cpp').read_text(encoding='utf-8')
+    effects = (ROOT / 'src/server/game/Spells/SpellEffects.cpp').read_text(encoding='utf-8')
     code = r'''
 #include <cassert>
 #include <cstdint>
@@ -28,6 +30,7 @@ def main():
 #include <vector>
 #include <type_traits>
 using uint8=std::uint8_t;using uint32=std::uint32_t;using uint64=std::uint64_t;
+using int32=std::int32_t;
 struct ObjectGuid
 {
     uint64 id=0;explicit operator bool()const{return id!=0;}void Clear(){id=0;}
@@ -55,6 +58,7 @@ using WorldPacket=ByteBuffer;
         code += method(header, 'enum ' + enum) + ';\n'
     code += r'''
 constexpr uint32 PLAYER_FLAGS_NO_PLAY_TIME=1;
+constexpr uint32 SKILL_SKINNING=393,UNIT_FLAG_SKINNABLE=1,UNIT_DYNFLAG_LOOTABLE=1;
 constexpr float INTERACTION_DISTANCE=5;
 enum InventoryResult{EQUIP_ERR_OK,EQUIP_ERR_INVENTORY_FULL};
 struct Player;struct Creature;
@@ -73,20 +77,28 @@ struct Loot
 {
     std::vector<LootItem> items,quest_items;uint32 gold=12;ObjectGuid roundRobinPlayer,sourceWorldObjectGUID{3};
     LootType loot_type=LOOT_CORPSE;QuestItemMap quests,ffa,conditional;
-    bool isLooted()const{return false;}bool hasItemForAll()const{return true;}
+    bool drained=false;bool isLooted()const{return drained;}bool hasItemForAll()const{return true;}
     bool hasItemFor(Player const*)const{return true;}
     bool hasOverThresholdItem()const{return true;}
     QuestItemMap const& GetPlayerQuestItems()const{return quests;}
     QuestItemMap const& GetPlayerFFAItems()const{return ffa;}
     QuestItemMap const& GetPlayerNonQuestNonFFAConditionalItems()const{return conditional;}
 };
+struct CreatureTemplate
+{uint32 skill=SKILL_SKINNING;uint32 GetRequiredLootSkill()const{return skill;}};
 struct Creature
 {
     ObjectGuid guid{3},owner{1};bool alive=false,inRange=true,los=true,reward=true;
     Player* recipient=nullptr;Group* group=nullptr;
     Loot loot;std::list<Creature*> nearby;
+    CreatureTemplate definition;uint32 flags=UNIT_FLAG_SKINNABLE;int32 level=20;
+    CreatureTemplate const* GetCreatureTemplate()const{return &definition;}
+    bool IsCreature()const{return true;}Creature* ToCreature(){return this;}
+    uint32 GetUnitFlags()const{return flags;}void RemoveUnitFlag(uint32 value){flags&=~value;}
+    void SetDynamicFlag(uint32){}bool IsCritter()const{return false;}bool isElite()const{return false;}
+    int32 GetLevel()const{return level;}
     void GetDeadCreatureListInGrid(std::list<Creature*>& out,float radius,bool deadOnly)const
-    {assert(radius==40 && deadOnly);out=nearby;}
+    {assert((radius==40 || radius==20) && deadOnly);out=nearby;}
     ObjectGuid GetGUID()const{return guid;}ObjectGuid GetOwnerGUID()const{return owner;}
     bool IsAlive()const{return alive;}
     bool isDead()const{return !alive;}bool IsDamageEnoughForLootingAndReward()const{return reward;}
@@ -105,11 +117,19 @@ struct Session
 struct Player
 {
     bool alive=true,inWorld=true,restricted=false,full=false;uint32 resetChecks=0;
+    bool skinning=true,knowsSkinning=true;int32 skill=100;uint32 skillUps=0,skinGenerations=0;
     Map map;Session session{this};Session* m_session=&session;ObjectGuid lootGuid,m_companionLootGuid;
     Creature* current=nullptr;Group* group=nullptr;PermissionTypes permission=OWNER_PERMISSION;
     std::vector<uint8> stored;
     bool IsAlive()const{return alive;}bool IsInWorld()const{return inWorld;}
     bool HasPlayerFlag(uint32)const{return restricted;}
+    bool HasSkill(uint32 id)const{return id==SKILL_SKINNING && skinning;}
+    bool HasSpell(uint32 id)const{return id==8613 && knowsSkinning;}
+    bool IsPlayer()const{return true;}Player* ToPlayer(){return this;}
+    int32 GetSkillValue(uint32)const{return skill;}int32 GetPureSkillValue(uint32)const{return skill;}
+    void UpdateGatherSkill(uint32 id,int32 value,int32 required,int32 multiplier)
+    {assert(id==SKILL_SKINNING && value==skill && required>=0 && multiplier==1);++skillUps;}
+    void CastSpell(Creature*,uint32,bool);
     ObjectGuid GetGUID()const{return {1};}ObjectGuid GetCritterGUID()const{return {2};}
     ObjectGuid GetLootGUID()const{return lootGuid;}
     Map* GetMap(){return &map;}Group* GetGroup()const{return group;}bool HasPendingBind()const{return false;}
@@ -121,17 +141,19 @@ struct Player
     }
     bool isAllowedToLoot(Creature const*);
     bool IsWithinLootDistance(Creature const*)const;
-    void LootCreatureWithCompanion(Creature*,float);
+    void LootCreatureWithCompanion(Creature*,float,bool skin=false);
     void SendLoot(ObjectGuid,LootType);
 };
 struct Scripts{void OnPlayerAfterCreatureLoot(Player*){}} scripts;
 auto sScriptMgr=&scripts;
 struct Template{uint32 DisplayInfoID=100;};
 constexpr uint32 EFFECT_0=0;
-struct Effect{uint32 Amplitude=1000;float CalcRadius(Player*)const{return 40;}};
+struct Effect{uint32 Amplitude=1000;float radius=40;float CalcRadius(Player*)const{return radius;}};
 struct SpellInfo{std::array<Effect,1> Effects;};
-struct Manager{Template row;SpellInfo spell;Template* GetItemTemplate(uint32){return &row;}
-    SpellInfo const* GetSpellInfo(uint32 id)const{assert(id==84419);return &spell;}} manager;
+struct Manager{Template row;SpellInfo spell,skin{{Effect{5000,20}}};
+    Template* GetItemTemplate(uint32){return &row;}
+    SpellInfo const* GetSpellInfo(uint32 id)const
+    {assert(id==84419 || id==92864);return id==92864?&skin:&spell;}} manager;
 auto sObjectMgr=&manager;
 auto sSpellMgr=&manager;
 '''
@@ -145,9 +167,36 @@ auto sSpellMgr=&manager;
     code += method(player, 'bool Player::IsWithinLootDistance(')
     code += method(player, 'void Player::LootCreatureWithCompanion(')
     code += r'''
+enum SpellCastResult {SPELL_CAST_OK,SPELL_FAILED_BAD_TARGETS,SPELL_FAILED_TARGET_UNSKINNABLE,
+    SPELL_FAILED_TARGET_NOT_LOOTED,SPELL_FAILED_LOW_CASTLEVEL};
+using SpellEffIndex=uint8;
+constexpr uint32 SPELL_EFFECT_SKINNING=95,SPELL_EFFECT_HANDLE_HIT_TARGET=1;
+struct SkinSpell
+{
+    Player* m_caster;Creature* unitTarget;uint32 effectHandleMode=SPELL_EFFECT_HANDLE_HIT_TARGET;
+    struct Targets{Creature* target;Creature* GetUnitTarget()const{return target;}} m_targets;
+    SpellCastResult Check()
+    {
+        switch(SPELL_EFFECT_SKINNING)
+        {
+'''
+    code += method(spell, 'case SPELL_EFFECT_SKINNING:')
+    code += '\n}\nreturn SPELL_CAST_OK;\n}\nvoid EffectSkinning(SpellEffIndex);\n};\n'
+    code += method(effects, 'void Spell::EffectSkinning(').replace('Spell::EffectSkinning', 'SkinSpell::EffectSkinning')
+    code += r'''
+void Player::CastSpell(Creature* target,uint32 id,bool triggered)
+{
+    assert(id==8613 && triggered && IsWithinLootDistance(target));
+    SkinSpell spell{this,target,SPELL_EFFECT_HANDLE_HIT_TARGET,{target}};
+    if (spell.Check()==SPELL_CAST_OK) spell.EffectSkinning(0);
+}
+'''
+    code += r'''
 void Player::SendLoot(ObjectGuid guid,LootType lootType)
 {
     assert(current && IsWithinLootDistance(current));lootGuid=guid;Loot* loot=&current->loot;
+    if(lootType==LOOT_SKINNING && loot->loot_type!=LOOT_SKINNING)
+    {loot->loot_type=LOOT_SKINNING;loot->drained=false;loot->items.resize(1);++skinGenerations;}
     WorldPacket data;data<<guid<<uint8(lootType)<<LootView(*loot,this,permission);
 '''
     code += method(player, 'if (guid == m_companionLootGuid)') + '\n}\n'
@@ -156,7 +205,7 @@ void Player::SendLoot(ObjectGuid guid,LootType lootType)
 struct State
 {
     std::array<uint32,69> ActiveAppearances{};std::unordered_set<uint32> CollectedAppearances;
-    uint32 CompanionLootTimer=0;
+    uint32 CompanionLootTimer=0,CompanionSkinningTimer=0;
 };
 struct Cosmetics
 {
@@ -181,6 +230,30 @@ struct Case
 };
 int main()
 {
+    {Case c;c.corpse.loot.drained=true;c.player.full=true;
+        c.player.LootCreatureWithCompanion(&c.corpse,20,true);
+        assert(c.player.skinGenerations==1 && c.player.skillUps==1 && c.player.stored.empty());
+        assert(!(c.corpse.flags&UNIT_FLAG_SKINNABLE) && !c.player.m_companionLootGuid);
+        c.player.full=false;c.player.LootCreatureWithCompanion(&c.corpse,20,true);
+        assert(c.player.skinGenerations==1 && c.player.skillUps==1 && c.player.stored.size()==1);}
+    for(int gate=0;gate<7;++gate)
+    {
+        Case c;c.corpse.loot.drained=true;
+        if(gate==0)c.player.skinning=false;if(gate==1)c.player.knowsSkinning=false;
+        if(gate==2)c.corpse.definition.skill=186;if(gate==3)c.corpse.flags=0;
+        if(gate==4)c.corpse.loot.drained=false;if(gate==5)c.player.skill=1;
+        if(gate==6){c.corpse.loot.loot_type=LOOT_SKINNING;c.corpse.owner={99};}
+        c.player.LootCreatureWithCompanion(&c.corpse,20,true);
+        assert(!c.player.skinGenerations && !c.player.skillUps && c.player.stored.empty());
+    }
+    {Case c;Cosmetics cosmetics;c.pet.nearby={&c.corpse};c.corpse.loot.drained=true;
+        cosmetics.collection->ActiveAppearances[61]=639807;
+        cosmetics.collection->CollectedAppearances.insert(639807);
+        cosmetics.ProcessCompanionLoot(&c.player,1,true);assert(c.player.skillUps==1);
+        cosmetics.ProcessCompanionLoot(&c.player,4999,true);assert(c.player.session.moneyCalls==1);
+        cosmetics.ProcessCompanionLoot(&c.player,1,true);assert(c.player.session.moneyCalls==2);
+        cosmetics.collection->ActiveAppearances[61]=0;
+        cosmetics.ProcessCompanionLoot(&c.player,5000,true);assert(c.player.session.moneyCalls==2);}
     {Case c;Cosmetics cosmetics;c.pet.nearby={&c.corpse};
         cosmetics.ProcessCompanionLoot(&c.player,1);assert(c.player.stored.empty());
         cosmetics.collection->ActiveAppearances[38]=47520;
@@ -229,7 +302,8 @@ int main()
         subprocess.run([compiler, '/nologo', '/std:c++20', '/EHsc', '/W4', '/WX', '/utf-8',
                         str(cpp), '/Fe' + str(exe)], cwd=out, check=True, timeout=60)
         subprocess.run([str(exe)], cwd=out, check=True, timeout=15)
-    print('PASS: native loot-view permissions, group rolls, master loot, quest/FFA slots, full bags and scoped reach')
+    print('PASS: native loot permissions, skinning admission/skill-ups, '
+          'full-bag retry, wardrobe timers and scoped reach')
 
 
 if __name__ == '__main__':
