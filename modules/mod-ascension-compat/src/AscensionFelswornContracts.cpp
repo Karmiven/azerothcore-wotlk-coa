@@ -16,6 +16,9 @@ void ApplyContracts(SpellInfo* info)
     if (!info || info->SpellFamilyName != 20)
         return;
     uint32 id = info->Id;
+    // Blood of Mannoroth's sole resource helper must grant all six charges, including from zero.
+    if (id == MannorothFelfury)
+        info->Effects[EFFECT_0].MiscValue = 6;
     auto dummy = [info](uint8 slot) {
         info->Effects[slot].ApplyAuraName = SPELL_AURA_DUMMY;
         info->Effects[slot].TriggerSpell = 0;

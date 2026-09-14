@@ -14,7 +14,8 @@ namespace AscensionFelsworn
 {
 enum FelswornSpells : uint32
 {
-    BurningCommander = 92089
+    BurningCommander = 92089,
+    MannorothFelfury = 801043
 };
 
 struct Debt

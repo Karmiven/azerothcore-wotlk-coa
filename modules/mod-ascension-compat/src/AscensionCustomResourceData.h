@@ -116,8 +116,14 @@ struct ResourceGainRule
 // These active abilities advertise resource generation in their tooltips, but
 // their public Spell.dbc records contain no effect that performs it. Ranges are
 // rank chains verified against the local Ascension spell dump.
-inline constexpr std::array<ResourceGainRule, 166> ResourceGainRules =
+inline constexpr std::array<ResourceGainRule, 177> ResourceGainRules =
 {{
+    // Native helpers already supply Twin Slice, Fel Fireball, and Seeking Flame.
+    // Fel Torpedo and the current Bane variants generate through their class scripts.
+    {14, 524706, 524706, 800058, 1, ResourceMutation::AuraStacks,
+        ResourceGainEvent::FirstSuccessfulHostileTarget},
+    {14, 805240, 805240, 800058, 1, ResourceMutation::AuraStacks,
+        ResourceGainEvent::EachSuccessfulDamagingHit},
     {14, 704368, 704368, 800058, 1, ResourceMutation::AuraStacks,
         ResourceGainEvent::FirstSuccessfulHostileTarget},
     {14, 706415, 706420, 800058, 1, ResourceMutation::AuraStacks,
@@ -140,6 +146,21 @@ inline constexpr std::array<ResourceGainRule, 166> ResourceGainRules =
     {14, 801903, 801903, 800058, 2, ResourceMutation::AuraStacks,
         ResourceGainEvent::FirstSuccessfulHostileTarget},
 
+    {16, 501421, 501432, 803102, 20, ResourceMutation::AuraStacks,
+        ResourceGainEvent::FirstSuccessfulHostileTarget, 0, 800098},
+    {16, 801844, 801844, 803102, 20, ResourceMutation::AuraStacks,
+        ResourceGainEvent::FirstSuccessfulHostileTarget, 0, 800098},
+    {16, 807105, 807111, 803102, 25, ResourceMutation::AuraStacks,
+        ResourceGainEvent::FirstSuccessfulHostileTarget, 0, 800098},
+    {16, 500043, 500043, 803102, 10, ResourceMutation::AuraStacks,
+        ResourceGainEvent::Cast, 0, 800098},
+    {16, 500925, 500925, 803102, 40, ResourceMutation::AuraStacks,
+        ResourceGainEvent::Cast, 0, 800098},
+    {16, 500927, 500927, 803102, 20, ResourceMutation::AuraStacks,
+        ResourceGainEvent::Cast, 0, 800098},
+    {16, 560032, 560032, 803102, 50, ResourceMutation::AuraStacks,
+        ResourceGainEvent::Cast, 0, 800098},
+    // Shock's learned-Call-Lightning gate and triggered repeat are handled by the class script.
     {16, 570138, 570141, 803102, 20, ResourceMutation::AuraStacks,
         ResourceGainEvent::FirstSuccessfulHostileTarget, 0, 800098},
     {16, 804036, 804036, 803102, 20, ResourceMutation::AuraStacks,
@@ -212,6 +233,8 @@ inline constexpr std::array<ResourceGainRule, 166> ResourceGainRules =
     {17, 501508, 501510, 500906, 2, ResourceMutation::AuraStacks, ResourceGainEvent::FirstSuccessfulHostileTarget},
     {17, 578119, 578119, 500906, 2, ResourceMutation::AuraStacks, ResourceGainEvent::FirstSuccessfulHostileTarget},
     {17, 804353, 804353, 500906, 2, ResourceMutation::AuraStacks, ResourceGainEvent::FirstSuccessfulHostileTarget},
+    {17, 806869, 806874, 500906, 2, ResourceMutation::AuraStacks, ResourceGainEvent::FirstSuccessfulHostileTarget},
+    {17, 520005, 520005, 500906, 1, ResourceMutation::AuraStacks, ResourceGainEvent::FirstSuccessfulHostileTarget},
 
     {21, 800086, 800086, 804329, 1, ResourceMutation::AuraStacks},
     {21, 800088, 800088, 804329, 1, ResourceMutation::AuraStacks},
