@@ -67,7 +67,7 @@ def main():
     if args.spell_dbc:
         raw = args.spell_dbc.read_bytes()
         count = struct.unpack_from("<I", raw, 4)[0]
-        wanted = {804019, 806010, 806020, 500348, 680918, 806016, 300836, 804022, 712431, 712488, 500019, 804036}
+        wanted = {804019, 806010, 806020, 500348, 680918, 806016, 300836, 804022, 712431, 712488, 500019, 804036, 707543, 807465, 807555, 807464}
         rows = {r[0]: r for r in struct.iter_unpack("<234I", raw[20:20 + count * 936]) if r[0] in wanted}
         assert rows[804019][71] == 56 and rows[804019][110] == 500941
         assert rows[806010][71:74] == (6, 6, 140) and rows[806010][86:89] == (5, 5, 5)
@@ -82,6 +82,11 @@ def main():
         assert rows[500019][95] == 108 and rows[500019][110] == 0  # Percent DAMAGE modifier.
         assert rows[500019][80] + rows[500019][74] == 200
         assert rows[500019][123] & rows[804036][210] == 131072  # Gale receives the modifier.
+        assert rows[707543][71] == 140 and rows[707543][86] == 5 and rows[707543][116] == 807465
+        assert rows[807465][86] == 1 and rows[807465][34] == 0  # Native force-cast makes the pet cast on itself.
+        assert rows[807555][208] == 22 and rows[807555][95] == 3 and rows[807555][98] == 3000
+        assert rows[807555][80] + rows[807555][74] == 59 and rows[807555][40] == 86
+        assert rows[807464][95:97] == (22, 87) and rows[807464][110:112] == (126, 126)
         raw = (args.spell_dbc.parent / "CreatureDisplayInfo.dbc").read_bytes()
         count = struct.unpack_from("<I", raw, 4)[0]
         displays = {r[0]: r for r in struct.iter_unpack("<16I", raw[20:20 + count * 64])}

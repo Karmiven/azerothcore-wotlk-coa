@@ -2059,6 +2059,10 @@ void Player::Regenerate(Powers power)
 
 void Player::RegenerateHealth()
 {
+    // Copied Resynchronization records use POWER_HEALTH for the health regeneration lock.
+    if (HasAuraTypeWithMiscvalue(SPELL_AURA_PREVENT_REGENERATE_POWER, POWER_HEALTH))
+        return;
+
     uint32 curValue = GetHealth();
     uint32 maxValue = GetMaxHealth();
 

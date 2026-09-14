@@ -10,7 +10,9 @@ using int8 = std::int8_t;
 using uint32 = std::uint32_t;
 using int32 = std::int32_t;
 // NATIVE_ENUMS
-constexpr uint32 EFFECT_0 = 0;
+constexpr uint32 EFFECT_0 = 0, EFFECT_1 = 1, SPELL_AURA_MOD_DAMAGE_PERCENT_TAKEN = 87,
+    SPELL_SCHOOL_MASK_NATURE = 8, SPELLVALUE_BASE_POINT0 = 0,
+    SPELL_DAMAGE_CLASS_NONE = 0, GLOBALHOOK_ON_LOAD_SPELL_CUSTOM_ATTR = 3;
 constexpr int PLAYERHOOK_ON_BEFORE_GUARDIAN_INIT_STATS_FOR_LEVEL = 1, PLAYERHOOK_ON_UPDATE = 2;
 struct ObjectGuid
 {
@@ -21,7 +23,15 @@ struct Unit;
 struct Pet;
 struct SpellInfo
 {
-    uint32 StackAmount = 10;
+    uint32 StackAmount = 10, Id = 807555, SpellFamilyName = 22, DmgClass = 1;
+    struct Slot
+    {
+        float BonusMultiplier = 1.0f;
+        uint32 ApplyAuraName = 0;
+        int32 BasePoints = 0, DieSides = 1;
+        int32 CalcValue(Unit*) const { return 59; }
+        int32 CalcBaseValue(int32 value) const { return DieSides ? value - 1 : value; }
+    } Effects[3];
     uint32 ProcChance = 15;
     bool HasAttribute(SpellAttr1) const { return false; }
     int32 CalcMaxAuraStacks(Unit*) const { return int32(StackAmount); }
@@ -29,7 +39,7 @@ struct SpellInfo
 struct SpellMgr
 {
     SpellInfo procInfo;
-    SpellInfo const* GetSpellInfo(uint32 id) const { assert(id == 712488); return &procInfo; }
+    SpellInfo const* GetSpellInfo(uint32 id) const { assert(id == 712488 || id == 807555); return &procInfo; }
 } spellMgr;
 SpellMgr* sSpellMgr = &spellMgr;
 uint32 fixtureRoll = 0, fixtureRolls = 0;
@@ -64,6 +74,7 @@ struct Unit
     bool alive = true, inWorld = true, samePhase = true, friendly = false;
     std::map<uint32, Aura> auras;
     std::vector<uint32> casts;
+    std::vector<std::pair<Unit*,int32>> flurries;
     virtual Pet* ToPet() { return nullptr; }
     ObjectGuid GetGUID() const { return guid; }
     Map* GetMap() const { return map; }
@@ -77,6 +88,10 @@ struct Unit
         return it != auras.end() && it->second.caster == caster ? &it->second : nullptr;
     }
     bool HasAura(uint32 id, ObjectGuid caster) { return GetAura(id, caster) != nullptr; }
+    void RemoveAurasDueToSpell(uint32 id, ObjectGuid caster)
+    { if (HasAura(id,caster)) auras.erase(id); }
+    void CastCustomSpell(uint32 id, uint32 slot, int32 amount, Unit* target, bool triggered)
+    { assert(id==807555 && slot==0 && triggered);flurries.emplace_back(target,amount); }
     void CastSpell(Unit* target, uint32 id, bool triggered)
     {
         assert(triggered);
@@ -116,6 +131,7 @@ struct Player : Unit
     Pet* pet = nullptr;
     std::set<uint32> spells{804019};
     bool removed = false;
+    int32 SpellBaseDamageBonusDone(uint32 school){assert(school==8);return 500;}
     uint32 getClass() const { return cls; }
     Pet* GetPet() const { return pet; }
     bool HasActiveSpell(uint32 id) const { return spells.contains(id); }
@@ -132,6 +148,11 @@ struct PlayerScript
     PlayerScript(char const*, std::initializer_list<int>) { }
     virtual void OnPlayerBeforeGuardianInitStatsForLevel(Player*, Guardian*, CreatureTemplate const*, PetType&) { }
     virtual void OnPlayerUpdate(Player*, uint32) { }
+};
+struct GlobalScript
+{
+    GlobalScript(char const*,std::initializer_list<int>){}
+    virtual void OnLoadSpellCustomAttr(SpellInfo*){}
 };
 struct DamageInfo
 {
@@ -275,6 +296,33 @@ int main()
     pet.auras[680918].caster = pet.guid;
     first.RestoreDuration();
     assert(pet.GetAura(680918, pet.guid)->duration == 15000);
+    pet.auras[807465].caster=pet.guid;
+    damage.damage=0;assert(!proc.CheckProc(event) && pet.flurries.empty());
+    damage.damage=30;
+    assert(proc.CheckProc(event));proc.Invigorate(nullptr,event);
+    assert(pet.flurries.size()==1 && pet.flurries[0].first==&enemy && pet.flurries[0].second==159);
+    assert(!pet.HasAura(807465,pet.guid));
+    proc.Invigorate(nullptr,event);assert(pet.flurries.size()==1);
+    pet.auras[807465].caster=owner.guid;
+    proc.Invigorate(nullptr,event);assert(pet.flurries.size()==1); // An unrelated caster's aura is not the pet's command.
+    SpellInfo flurryInfo;
+    stormbringer_pet_contracts contracts;
+    contracts.OnLoadSpellCustomAttr(&flurryInfo);
+    assert(flurryInfo.DmgClass==1 && !flurryInfo.Effects[0].BonusMultiplier);
+    flurryInfo=SpellInfo{};flurryInfo.SpellFamilyName=3;
+    contracts.OnLoadSpellCustomAttr(&flurryInfo);assert(flurryInfo.Effects[0].BonusMultiplier==1.0f);
+    flurryInfo = SpellInfo{};
+    flurryInfo.Id = 807464;
+    flurryInfo.Effects[1].ApplyAuraName = SPELL_AURA_MOD_DAMAGE_PERCENT_TAKEN;
+    flurryInfo.Effects[0].BasePoints = -21;
+    flurryInfo.Effects[1].BasePoints = -3;
+    contracts.OnLoadSpellCustomAttr(&flurryInfo);
+    assert(flurryInfo.Effects[1].BasePoints + flurryInfo.Effects[1].DieSides == 2);
+    assert(flurryInfo.Effects[0].BasePoints == -21);
+    flurryInfo.SpellFamilyName = 3;
+    flurryInfo.Effects[1].BasePoints = -3;
+    contracts.OnLoadSpellCustomAttr(&flurryInfo);
+    assert(flurryInfo.Effects[1].BasePoints == -3);
     owner.spells.clear();
     assert(!first.Load() && !proc.CheckProc(event));
     lifecycle.OnPlayerUpdate(&owner, 1);

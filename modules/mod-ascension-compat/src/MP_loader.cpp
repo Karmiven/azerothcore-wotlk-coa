@@ -17,6 +17,7 @@
 void AddAscensionCompatScripts();
 void AddAscensionTravelPermitScripts();
 void AddSC_AscensionRulesets();
+void AddSC_AscensionThreatRedirect();
 void AddCoABugReportScripts();
 void AddAscensionBarbarianCompletionScripts();
 void AddAscensionBarbarianEventScripts();
@@ -123,6 +124,13 @@ void AddSC_AscensionStormbringerTalents();
 void AddSC_AscensionStormbringerWindGate();
 void AddSC_AscensionStormbringerZephyr();
 void AddSC_AscensionStormbringerPet();
+void AddSC_AscensionStormbringerSphere();
+void AddSC_AscensionBloodmageSecondary();
+void AddSC_AscensionBloodmageHemostasis();
+void AddSC_AscensionRangerSecondary();
+void AddSC_AscensionRangerDirtyFighter();
+void AddSC_AscensionRangerHookshot();
+void AddSC_AscensionRangerOutmaneuver();
 void AddSC_AscensionRunemasterManuscription();
 void AddSC_AscensionRangerTalents();
 void AddSC_AscensionRangerFlowers();
@@ -137,7 +145,15 @@ void AddSC_AscensionBloodmageVitality();
 void AddSC_AscensionReaperReflexes();
 void AddSC_AscensionPrimalistMountain();
 void AddSC_AscensionChronomancerRipple();
+void AddSC_AscensionChronomancerSecondary();
+void AddSC_AscensionVenomancerSerpentFang();
+void AddSC_AscensionSunClericBattleCleric();
 void AddSC_AscensionReaperTalents();
+void AddSC_AscensionReaperSecondary();
+void AddSC_AscensionPrimalistSecondary();
+void AddSC_AscensionRunemasterSecondary();
+void AddSC_AscensionRunemasterHurricane();
+void AddSC_AscensionRunemasterRiftClones();
 
 // Add all
 // cf. the naming convention https://github.com/azerothcore/azerothcore-wotlk/blob/master/doc/changelog/master.md#how-to-upgrade-4
@@ -258,6 +274,13 @@ void Addmod_ascension_compatScripts()
     AddSC_AscensionStormbringerWindGate();
     AddSC_AscensionStormbringerZephyr();
     AddSC_AscensionStormbringerPet();
+    AddSC_AscensionStormbringerSphere();
+    AddSC_AscensionBloodmageSecondary();
+    AddSC_AscensionBloodmageHemostasis();
+    AddSC_AscensionRangerSecondary();
+    AddSC_AscensionRangerDirtyFighter();
+    AddSC_AscensionRangerHookshot();
+    AddSC_AscensionRangerOutmaneuver();
     AddSC_AscensionRunemasterManuscription();
     AddSC_AscensionRangerTalents();
     AddSC_AscensionRangerFlowers();
@@ -272,11 +295,20 @@ void Addmod_ascension_compatScripts()
     AddSC_AscensionReaperReflexes();
     AddSC_AscensionPrimalistMountain();
     AddSC_AscensionChronomancerRipple();
+    AddSC_AscensionChronomancerSecondary();
+    AddSC_AscensionVenomancerSerpentFang();
+    AddSC_AscensionSunClericBattleCleric();
     AddSC_AscensionReaperTalents();
+    AddSC_AscensionReaperSecondary();
+    AddSC_AscensionPrimalistSecondary();
+    AddSC_AscensionRunemasterSecondary();
+    AddSC_AscensionRunemasterHurricane();
+    AddSC_AscensionRunemasterRiftClones();
     AddAscensionRunemasterZenithScripts();
     AddAscensionRunemasterEchoesScripts();
     AddAscensionVenomancerVenomScripts();
     AddAscensionTinkerCombatSymbiosisScripts();
     AddCoABugReportScripts();
     AddSC_AscensionRulesets();
+    AddSC_AscensionThreatRedirect();
 }

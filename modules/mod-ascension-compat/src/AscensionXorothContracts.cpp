@@ -24,6 +24,8 @@ void ApplyContracts(SpellInfo* info)
     if (!info || info->SpellFamilyName != 23)
         return;
     uint32 id = info->Id;
+    if (id == SPELL_WARPATH_PROTECTION && info->Effects[EFFECT_0].ApplyAuraName == SPELL_AURA_MOD_MINIMUM_SPEED)
+        info->DurationEntry = sSpellDurationStore.LookupEntry(27); // Three seconds after Unleash Pestilence.
     if (id == SPELL_FLESH_HOOK_PULL)
     {
         // The parent has already passed its range and hit checks before scheduling this helper.

@@ -62,6 +62,24 @@ int main()
     assert(apocalypse->duration == 3500);
     player.cls = 17;
 
+    auto slowCount = [&player]() {
+        return std::count_if(player.casts.begin(), player.casts.end(), [](auto const& cast) { return cast.id == 520309; });
+    };
+    info.Id = 805671;
+    casts.OnSpellHitResult(&spell, &enemy, 0, 100, 0, false);
+    assert(slowCount() == 0);
+    player.learnSpell(300392, false);
+    casts.OnSpellHitResult(&spell, &enemy, 0, 100, 0, false);
+    assert(slowCount() == 1);
+    casts.OnSpellHitResult(&spell, &enemy, SPELL_MISS_MISS, 100, 0, false);
+    casts.OnSpellHitResult(&spell, &enemy, 0, 0, 0, false);
+    spell.triggered = true;
+    casts.OnSpellHitResult(&spell, &enemy, 0, 100, 0, false);
+    spell.triggered = false;
+    assert(slowCount() == 1);
+    info.Id = 42;
+    casts.OnSpellHitResult(&spell, &enemy, 0, 100, 0, false);
+    assert(slowCount() == 1);
     Creature imp;
     imp.entry = 50301;
     Death death;
@@ -87,6 +105,31 @@ int main()
     death.owner = 99;
     death.JustDied(nullptr);
     assert(player.cooldowns[805677] == 8000 && player.cooldowns[524897] == 9000);
+
+    info.Id = SPELL_UNLEASH_PESTILENCE;
+    spell.SetScriptValue(500906, 0);
+    auto warpathCount = [&player]() {
+        return std::count_if(player.casts.begin(), player.casts.end(), [](auto const& cast) {
+            return cast.id == SPELL_WARPATH_PROTECTION;
+        });
+    };
+    assert(warpathCount() == 0);
+    casts.OnSpellCast(&spell, &player, &info, false);
+    assert(warpathCount() == 0);
+    player.AddAura(SPELL_WARPATH, &player);
+    casts.OnSpellCast(&spell, &player, &info, false);
+    assert(warpathCount() == 1);
+    spell.triggered = true;
+    casts.OnSpellCast(&spell, &player, &info, false);
+    assert(warpathCount() == 1);
+    spell.triggered = false;
+    info.Id = 801053;
+    casts.OnSpellCast(&spell, &player, &info, false);
+    assert(warpathCount() == 1);
+    info.Id = SPELL_UNLEASH_PESTILENCE;
+    player.cls = 14;
+    casts.OnSpellCast(&spell, &player, &info, false);
+    assert(warpathCount() == 1);
 }
 '''
 
@@ -107,9 +150,9 @@ def main():
         fixture.src = lambda part: (subprocess.check_output([
             "git", "show", f"{args.source_ref}:modules/mod-ascension-compat/src/AscensionXorothAbilities.cpp"
         ], cwd=ROOT).decode("utf-8") if part == "Abilities" else original_source(part))
-    production = fixture.methods("Abilities", ["RefundableMiss", "ConsumeSelected"])
+    production = fixture.methods("Abilities", ["RefundableMiss", "ConsumeSelected", "RecordBellowsResult"])
     production += "\n#ifdef _MSC_VER\n#pragma warning(push)\n#pragma warning(disable: 4244)\n#endif\n"
-    production += fixture.wrap("Casts", "Abilities", ["OnSpellCast"])
+    production += fixture.wrap("Casts", "Abilities", ["OnSpellCast", "OnSpellHitResult"])
     production += "\n#ifdef _MSC_VER\n#pragma warning(pop)\n#endif\n"
     production += "namespace ObjectAccessor { Player* GetPlayer(Unit&, ObjectGuid id) { return FindPlayer(id); } }\n"
     production += "struct Death { Creature* me; ObjectGuid owner; "
@@ -118,7 +161,7 @@ def main():
     # This fixture previously extracted only narrower callbacks. The completed
     # cast also references unrelated pet and delayed-Sever APIs; bind them inertly.
     code, player_count = re.subn(r"struct Player\s*:\s*Unit\s*\{",
-        "using Pet = Unit; struct Player:Unit { Pet* GetPet() { return nullptr; }", code)
+        "using Pet = Unit; struct Player:Unit { Pet* GetPet() { return nullptr; } bool HasActiveSpell(uint32 id) const {return HasSpell(id);}", code)
     code, scheduler_count = re.subn(r"struct TaskScheduler\s*\{",
         "struct TaskContext {}; struct TaskScheduler { "
         "template<typename D, typename F> void Schedule(D, F) { assert(false); }", code)

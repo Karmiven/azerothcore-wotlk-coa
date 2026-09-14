@@ -680,8 +680,9 @@ void ApplyAdditionalTargetContracts(SpellInfo* spellInfo)
         int32 BasePoints;
         std::array<uint32, 3> Mask;
     };
-    static constexpr std::array<Contract, 7> contracts =
+    static constexpr std::array<Contract, 8> contracts =
     {{
+        {801429, 27, EFFECT_1, 0, {{0, 4, 0}}},     // Advantage: Quills
         {705068, 27, EFFECT_2, 1, {{512, 0, 0}}},    // Aerial Assault
         {704794, 32, EFFECT_0, 0, {{0, 128, 0}}},    // Pulsar Explosion, rank 1
         {707894, 32, EFFECT_0, 1, {{0, 128, 0}}},    // Pulsar Explosion, rank 2

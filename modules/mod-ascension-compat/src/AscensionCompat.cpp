@@ -112,6 +112,8 @@ constexpr uint16 CMSG_MISSILE_FIRE_POSITION = 0x09C7;
 constexpr uint32 SPELL_PYROMANCER_HEAT = 807389;
 constexpr uint32 SPELL_PYROMANCER_EMBER = 807533;
 constexpr uint32 SPELL_PRIMALIST_EARTHSHAPING = 680441;
+constexpr uint32 SPELL_STORMBRINGER_STATIC = 803102;
+constexpr uint32 SPELL_STORMBRINGER_CHARGED_CONDUIT = 803790;
 constexpr uint32 SPELL_REAPER_REAPED_SOUL = 500363;
 constexpr uint32 SPELL_REAPER_SOUL_INFUSION = 803031;
 constexpr uint32 SPELL_REAPER_SOUL_FRAGMENT = 805077;
@@ -1591,6 +1593,10 @@ public:
             if (!Matches(player, spellId, rule.ClassId, rule.FirstSpellId,
                     rule.LastSpellId))
                 continue;
+
+            if (rule.ClassId == CLASS_STORMBRINGER && rule.ResourceSpellId == SPELL_STORMBRINGER_STATIC &&
+                player->HasAura(SPELL_STORMBRINGER_CHARGED_CONDUIT))
+                break;
 
             if (rule.PreserveCostAuraSpellId &&
                 player->HasAura(rule.PreserveCostAuraSpellId) &&

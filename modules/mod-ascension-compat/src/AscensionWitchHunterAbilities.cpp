@@ -87,6 +87,11 @@ class witch_hunter_casts : public AllSpellScript
             return;
         SpellInfo const* info = spell->GetSpellInfo();
         float multiplier = 1.0f;
+        // Every Brand rank releases this payload; its advertised creature bonus
+        // was only stored in an unlearned legacy passive.
+        if (info->Id == SPELL_BRAND_OF_THE_DAMNED_DAMAGE && info->SpellFamilyName == 21 &&
+            hit.missCondition == SPELL_MISS_NONE && (target->GetCreatureTypeMask() & CREATURE_TYPEMASK_DEMON_OR_UNDEAD))
+            multiplier *= 2.0f;
         bool brand = target->HasAura(680517, player->GetGUID());
         if (brand && Noctis(info) && player->HasAura(707067))
             multiplier *= 1.5f;

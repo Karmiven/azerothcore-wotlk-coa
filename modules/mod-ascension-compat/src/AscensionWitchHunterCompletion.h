@@ -10,6 +10,11 @@ class Unit;
 
 namespace AscensionWitchHunter
 {
+enum WitchHunterSharedSpells : uint32
+{
+    SPELL_BRAND_OF_THE_DAMNED_DAMAGE = 807683
+};
+
 inline bool Family(SpellInfo const* info, uint8 word, uint32 mask)
 {
     return info && info->SpellFamilyName == 21 && (info->SpellFamilyFlags[word] & mask);

@@ -131,7 +131,8 @@ class aura_ascension_witch_hunter_lifecycle : public AuraScript
                 {
                     int32 base = effect->GetAmount();
                     Remove();
-                    caster->CastCustomSpell(807683, SPELLVALUE_BASE_POINT0, base, owner, TRIGGERED_FULL_MASK);
+                    caster->CastCustomSpell(SPELL_BRAND_OF_THE_DAMNED_DAMAGE, SPELLVALUE_BASE_POINT0, base, owner,
+                        TRIGGERED_FULL_MASK);
                 }
         }
         if (Family(GetSpellInfo(), 2, 4))

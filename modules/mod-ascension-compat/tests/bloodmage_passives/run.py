@@ -40,6 +40,25 @@ int main()
     player.cls = CLASS_MAGE;
     events.OnAuraRemove(&player, &removed, AURA_REMOVE_BY_EXPIRE);
     assert(player.casts.empty());
+    player.cls = CLASS_SON_OF_ARUGAL;
+    removed.aura.id = 562572;
+    events.OnAuraRemove(&player, &removed, AURA_REMOVE_BY_EXPIRE);
+    assert(player.casts.empty());
+    player.auras.insert(804851);
+    for (auto mode : {AURA_REMOVE_BY_EXPIRE, AURA_REMOVE_BY_CANCEL, AURA_REMOVE_BY_ENEMY_SPELL})
+    {
+        player.casts.clear();
+        events.OnAuraRemove(&player, &removed, mode);
+        assert(player.casts.size() == 1 && std::get<1>(player.casts[0]) == 504264);
+    }
+    player.casts.clear();
+    events.OnAuraRemove(&player, &removed, AURA_REMOVE_BY_DEATH);
+    removed.aura.id = 562720; // The ordinary form is not Accursed Form.
+    events.OnAuraRemove(&player, &removed, AURA_REMOVE_BY_EXPIRE);
+    removed.aura.id = 562572;
+    removed.aura.caster = 99;
+    events.OnAuraRemove(&player, &removed, AURA_REMOVE_BY_EXPIRE);
+    assert(player.casts.empty());
 }
 '''
 
@@ -63,7 +82,9 @@ def main():
     code = code.replace("// NATIVE_ENUMS", "\n".join(enums))
     code = code.replace("constexpr uint32 CLASS_WILDWALKER = 31, ", "constexpr uint32 ")
     source = (ROOT / "modules/mod-ascension-compat/src/AscensionBloodmageTalents.cpp").read_text()
-    code += re.sub(r"^#include.*\n", "", source, flags=re.M) + CASES
+    # Animated Blood has its own fixture; this one exercises the exit-event class.
+    code += native.extractor.extract(source, r"enum BloodmageTalentSpells\b") + ";\n"
+    code += native.extractor.extract(source, r"class bloodmage_talent_events\b") + ";\n" + CASES
     with tempfile.TemporaryDirectory(prefix="coa-bloodmage-passives-") as directory:
         native.OUT = Path(directory)
         result = native.compile_run(code, "bloodmage-passives")

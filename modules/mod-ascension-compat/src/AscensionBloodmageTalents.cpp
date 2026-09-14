@@ -12,7 +12,10 @@ enum BloodmageTalentSpells : uint32
     SPELL_VAMPIRIC_POOLS = 504088,
     SPELL_VAMPIRIC_POOLS_LEECH = 806311,
     SPELL_DARKCASTING = 712383,
-    SPELL_BLOOD_TEAR_SPAWN = 712417
+    SPELL_BLOOD_TEAR_SPAWN = 712417,
+    SPELL_ACCURSED_FORM = 562572,
+    SPELL_SANGUINE_SCRIPTURE = 804851,
+    SPELL_SANGUINE_SCRIPTURE_BUFF = 504264
 };
 
 class spell_ascension_animated_blood : public SpellScript
@@ -64,8 +67,12 @@ public:
         if (aura->GetId() == SPELL_LIQUIFY && aura->GetCasterGUID() == player->GetGUID() &&
             player->HasAura(SPELL_VAMPIRIC_POOLS))
             player->CastSpell(player, SPELL_VAMPIRIC_POOLS_LEECH, true);
+        if (aura->GetId() == SPELL_ACCURSED_FORM && aura->GetCasterGUID() == player->GetGUID() &&
+            player->HasAura(SPELL_SANGUINE_SCRIPTURE))
+            player->CastSpell(player, SPELL_SANGUINE_SCRIPTURE_BUFF, true);
     }
 };
+
 }
 
 void AddSC_AscensionBloodmageTalents()

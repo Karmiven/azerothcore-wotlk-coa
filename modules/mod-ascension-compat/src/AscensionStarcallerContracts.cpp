@@ -277,6 +277,12 @@ void ApplyContracts(SpellInfo* info)
 namespace
 {
 using namespace AscensionStarcaller;
+enum StarfireSpells : uint32
+{
+    SPELL_STARFIRE_SHOT = 801978,
+    SPELL_STARFIRE_FLAT_DAMAGE = 801977
+};
+
 class starcaller_scaling : public UnitScript
 {
   public:
@@ -292,6 +298,9 @@ class starcaller_scaling : public UnitScript
         Player* player = Owner(caster);
         if (!player || !info)
             return;
+        if (index == EFFECT_0 && Named(info, SPELL_STARFIRE_SHOT))
+            // Every rank's tooltip uses this helper for its flat damage; the weapon and mana terms stay separate.
+            value = float(Amount(SPELL_STARFIRE_FLAT_DAMAGE, EFFECT_0, player));
         for (auto const& row : StarcallerCoefficients)
             if (row.spell == info->Id && row.effect == index)
             {

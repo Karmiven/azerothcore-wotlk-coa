@@ -19,7 +19,10 @@ enum AirElementalSpells : uint32
     SPELL_INVIGORATION = 680918,
     SPELL_AURAT_SCRIPTS = 712431,
     SPELL_AURAT_SCRIPTS_PROC = 712488,
-    SPELL_AURAT_GALE = 500019
+    SPELL_AURAT_GALE = 500019,
+    SPELL_FLURRY_READY = 807465,
+    SPELL_FLURRY_DOT = 807555,
+    SPELL_FLURRY_DEBUFF = 807464
 };
 
 enum AirElementalEntries : uint32
@@ -78,7 +81,8 @@ class aura_ascension_air_invigoration : public AuraScript
 
     bool Validate(SpellInfo const*) override
     {
-        return ValidateSpellInfo({SPELL_GENERATE_INVIGORATION, SPELL_AURAT_SCRIPTS_PROC, SPELL_AURAT_GALE});
+        return ValidateSpellInfo({SPELL_GENERATE_INVIGORATION, SPELL_AURAT_SCRIPTS_PROC, SPELL_AURAT_GALE,
+            SPELL_FLURRY_READY, SPELL_FLURRY_DOT});
     }
 
     bool CheckProc(ProcEventInfo& event)
@@ -92,13 +96,23 @@ class aura_ascension_air_invigoration : public AuraScript
             event.GetDamageInfo() && event.GetDamageInfo()->GetDamage();
     }
 
-    void Invigorate(AuraEffect const*, ProcEventInfo&)
+    void Invigorate(AuraEffect const*, ProcEventInfo& event)
     {
         PreventDefaultAction();
         GetTarget()->CastSpell(GetTarget(), SPELL_GENERATE_INVIGORATION, true);
         // This aura already receives each successful owned-pet damage event at 100% chance.
         // The companion Aurat record retains the authored chance and empowered Gale helper.
         Player* owner = AirElementalOwner(GetTarget());
+        if (owner && GetTarget()->HasAura(SPELL_FLURRY_READY, GetTarget()->GetGUID()))
+        {
+            // The pet's existing successful-damage proc supplies the missing
+            // "next instance of damage" event for Flurry's zero-flag aura.
+            GetTarget()->RemoveAurasDueToSpell(SPELL_FLURRY_READY, GetTarget()->GetGUID());
+            int32 amount = sSpellMgr->GetSpellInfo(SPELL_FLURRY_DOT)->Effects[EFFECT_0].CalcValue(owner) +
+                int32(owner->SpellBaseDamageBonusDone(SPELL_SCHOOL_MASK_NATURE) * 0.2f);
+            GetTarget()->CastCustomSpell(SPELL_FLURRY_DOT, SPELLVALUE_BASE_POINT0, amount,
+                event.GetActionTarget(), true);
+        }
         if (owner && owner->HasActiveSpell(SPELL_AURAT_SCRIPTS) &&
             roll_chance_i(sSpellMgr->GetSpellInfo(SPELL_AURAT_SCRIPTS_PROC)->ProcChance))
         {
@@ -144,11 +158,32 @@ class spell_ascension_air_invigoration_duration : public SpellScript
         AfterCast += SpellCastFn(spell_ascension_air_invigoration_duration::RestoreDuration);
     }
 };
+
+class stormbringer_pet_contracts : public GlobalScript
+{
+public:
+    stormbringer_pet_contracts() : GlobalScript("stormbringer_pet_contracts",
+        {GLOBALHOOK_ON_LOAD_SPELL_CUSTOM_ATTR}) { }
+
+    void OnLoadSpellCustomAttr(SpellInfo* info) override
+    {
+        if (info && info->Id == SPELL_FLURRY_DEBUFF && info->SpellFamilyName == 22 &&
+            info->Effects[EFFECT_1].ApplyAuraName == SPELL_AURA_MOD_DAMAGE_PERCENT_TAKEN)
+            info->Effects[EFFECT_1].BasePoints = info->Effects[EFFECT_1].CalcBaseValue(2);
+        if (info && info->Id == SPELL_FLURRY_DOT && info->SpellFamilyName == 22)
+        {
+            // The proc snapshots the owner's Nature power. Keep native pet
+            // percentage and target modifiers without adding the pet's SP again.
+            info->Effects[EFFECT_0].BonusMultiplier = 0.0f;
+        }
+    }
+};
 }
 
 void AddSC_AscensionStormbringerPet()
 {
     new stormbringer_pet_lifecycle();
+    new stormbringer_pet_contracts();
     RegisterSpellScript(aura_ascension_air_invigoration);
     RegisterSpellScript(spell_ascension_air_invigoration_duration);
 }
