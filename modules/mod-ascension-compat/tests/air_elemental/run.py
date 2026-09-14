@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 import sqlite3
 import struct
+import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -14,6 +15,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workspace-tools", type=Path, default=ROOT.parent / "tools")
     parser.add_argument("--spell-dbc", type=Path)
+    parser.add_argument("--before", help="Use this Git revision's pet script as a regression negative control")
     args = parser.parse_args()
     spec = importlib.util.spec_from_file_location("air_compile", args.workspace_tools / "Test-LocalLoginCollections.py")
     native = importlib.util.module_from_spec(spec)
@@ -31,7 +33,9 @@ def main():
     code = code.replace("// NATIVE_ENUMS", "\n".join(enums))
     stack = native.extractor.extract((ROOT / "src/server/game/Spells/Auras/SpellAuras.cpp").read_text(), r"bool Aura::ModStackAmount\(")
     code = code.replace("// NATIVE_STACK", stack)
-    source = (ROOT / "modules/mod-ascension-compat/src/AscensionStormbringerPet.cpp").read_text()
+    source_path = "modules/mod-ascension-compat/src/AscensionStormbringerPet.cpp"
+    source = (subprocess.check_output(["git", "show", f"{args.before}:{source_path}"], cwd=ROOT, text=True)
+              if args.before else (ROOT / source_path).read_text())
     source = re.sub(r"^#include.*\n", "", source, flags=re.M)
     source = source.replace(": public SpellScript\n{", ": public SpellScript\n{\npublic:")
     source = source.replace(": public AuraScript\n{", ": public AuraScript\n{\npublic:")
@@ -63,7 +67,7 @@ def main():
     if args.spell_dbc:
         raw = args.spell_dbc.read_bytes()
         count = struct.unpack_from("<I", raw, 4)[0]
-        wanted = {804019, 806010, 806020, 500348, 680918, 806016, 300836, 804022}
+        wanted = {804019, 806010, 806020, 500348, 680918, 806016, 300836, 804022, 712431, 712488, 500019, 804036}
         rows = {r[0]: r for r in struct.iter_unpack("<234I", raw[20:20 + count * 936]) if r[0] in wanted}
         assert rows[804019][71] == 56 and rows[804019][110] == 500941
         assert rows[806010][71:74] == (6, 6, 140) and rows[806010][86:89] == (5, 5, 5)
@@ -73,6 +77,11 @@ def main():
         assert rows[806016][71] == 2 and rows[806016][104] == 2
         assert rows[300836][71:73] == (2, 183) and rows[300836][117] == 300838
         assert rows[804022][71] == 65 and rows[804022][95] == 216
+        assert rows[712431][208] == rows[712488][208] == rows[500019][208] == 22
+        assert rows[712488][35] == 15 and rows[712488][117] == 500019
+        assert rows[500019][95] == 108 and rows[500019][110] == 0  # Percent DAMAGE modifier.
+        assert rows[500019][80] + rows[500019][74] == 200
+        assert rows[500019][123] & rows[804036][210] == 131072  # Gale receives the modifier.
         raw = (args.spell_dbc.parent / "CreatureDisplayInfo.dbc").read_bytes()
         count = struct.unpack_from("<I", raw, 4)[0]
         displays = {r[0]: r for r in struct.iter_unpack("<16I", raw[20:20 + count * 64])}

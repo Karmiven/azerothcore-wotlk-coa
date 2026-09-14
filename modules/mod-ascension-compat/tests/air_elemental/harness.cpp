@@ -22,9 +22,18 @@ struct Pet;
 struct SpellInfo
 {
     uint32 StackAmount = 10;
+    uint32 ProcChance = 15;
     bool HasAttribute(SpellAttr1) const { return false; }
     int32 CalcMaxAuraStacks(Unit*) const { return int32(StackAmount); }
 };
+struct SpellMgr
+{
+    SpellInfo procInfo;
+    SpellInfo const* GetSpellInfo(uint32 id) const { assert(id == 712488); return &procInfo; }
+} spellMgr;
+SpellMgr* sSpellMgr = &spellMgr;
+uint32 fixtureRoll = 0, fixtureRolls = 0;
+bool roll_chance_i(uint32 chance) { ++fixtureRolls; return fixtureRoll < chance; }
 struct Aura
 {
     SpellInfo info;
@@ -39,7 +48,8 @@ struct Aura
     void Remove(AuraRemoveMode) { m_stackAmount = 0; }
     void RefreshSpellMods() { }
     void RefreshTimers(bool) { duration = 15000; }
-    void SetCharges(int) { }
+    int charges = 0;
+    void SetCharges(int value) { charges = value; }
     int CalcMaxCharges() { return 0; }
     void SetNeedClientUpdateForTargets() { }
     bool ModStackAmount(int32 num, AuraRemoveMode removeMode = AURA_REMOVE_BY_DEFAULT, bool periodicReset = false);
@@ -75,6 +85,12 @@ struct Unit
         {
             target->auras[id].caster = guid;
             target->auras[806020].caster = target->guid;
+        }
+        else if (id == 500019)
+        {
+            assert(target == this);
+            auras[id].caster = guid;
+            auras[id].charges = 0;
         }
         else
             assert(id == 500348 && target == this);
@@ -196,6 +212,23 @@ int main()
     assert(proc.CheckProc(event));
     proc.Invigorate(nullptr, event);
     assert(proc.prevented && pet.casts == std::vector<uint32>{500348});
+    assert(fixtureRolls == 0 && !owner.HasAura(500019, owner.guid));
+    owner.spells.insert(712431);
+    fixtureRoll = 14;
+    proc.Invigorate(nullptr, event);
+    assert(fixtureRolls == 1 && owner.casts.back() == 500019);
+    assert(owner.GetAura(500019, owner.guid)->charges == 1);
+    owner.GetAura(500019, owner.guid)->charges = 0;
+    proc.Invigorate(nullptr, event); // Another proc refreshes a single charge; it never accumulates charges.
+    assert(owner.GetAura(500019, owner.guid)->charges == 1);
+    owner.auras.erase(500019);
+    fixtureRoll = 15;
+    proc.Invigorate(nullptr, event);
+    assert(!owner.HasAura(500019, owner.guid));
+    owner.spells.erase(712431);
+    fixtureRoll = 0;
+    proc.Invigorate(nullptr, event);
+    assert(fixtureRolls == 3 && !owner.HasAura(500019, owner.guid));
     enemy.alive = false;
     assert(proc.CheckProc(event)); // Killing blows still dealt damage.
     enemy.alive = true;

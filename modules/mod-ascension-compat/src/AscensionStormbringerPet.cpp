@@ -1,9 +1,11 @@
 /* Copyright (C) 2016+ AzerothCore, GNU AGPL v3. */
 #include "Pet.h"
 #include "Player.h"
+#include "Random.h"
 #include "ScriptMgr.h"
 #include "SpellAuraEffects.h"
 #include "SpellAuras.h"
+#include "SpellMgr.h"
 #include "SpellScript.h"
 
 namespace
@@ -14,7 +16,10 @@ enum AirElementalSpells : uint32
     SPELL_AIR_ELEMENTAL_PASSIVE = 806010,
     SPELL_INVIGORATION_PROC = 806020,
     SPELL_GENERATE_INVIGORATION = 500348,
-    SPELL_INVIGORATION = 680918
+    SPELL_INVIGORATION = 680918,
+    SPELL_AURAT_SCRIPTS = 712431,
+    SPELL_AURAT_SCRIPTS_PROC = 712488,
+    SPELL_AURAT_GALE = 500019
 };
 
 enum AirElementalEntries : uint32
@@ -71,7 +76,10 @@ class aura_ascension_air_invigoration : public AuraScript
 {
     PrepareAuraScript(aura_ascension_air_invigoration);
 
-    bool Validate(SpellInfo const*) override { return ValidateSpellInfo({SPELL_GENERATE_INVIGORATION}); }
+    bool Validate(SpellInfo const*) override
+    {
+        return ValidateSpellInfo({SPELL_GENERATE_INVIGORATION, SPELL_AURAT_SCRIPTS_PROC, SPELL_AURAT_GALE});
+    }
 
     bool CheckProc(ProcEventInfo& event)
     {
@@ -88,6 +96,16 @@ class aura_ascension_air_invigoration : public AuraScript
     {
         PreventDefaultAction();
         GetTarget()->CastSpell(GetTarget(), SPELL_GENERATE_INVIGORATION, true);
+        // This aura already receives each successful owned-pet damage event at 100% chance.
+        // The companion Aurat record retains the authored chance and empowered Gale helper.
+        Player* owner = AirElementalOwner(GetTarget());
+        if (owner && owner->HasActiveSpell(SPELL_AURAT_SCRIPTS) &&
+            roll_chance_i(sSpellMgr->GetSpellInfo(SPELL_AURAT_SCRIPTS_PROC)->ProcChance))
+        {
+            owner->CastSpell(owner, SPELL_AURAT_GALE, true);
+            if (Aura* empowerment = owner->GetAura(SPELL_AURAT_GALE, owner->GetGUID()))
+                empowerment->SetCharges(1); // Native spell modifiers consume one charge for the whole Gale cast.
+        }
     }
 
     void Register() override
