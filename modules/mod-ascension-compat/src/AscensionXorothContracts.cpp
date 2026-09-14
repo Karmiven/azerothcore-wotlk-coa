@@ -10,11 +10,28 @@
 #include <algorithm>
 namespace AscensionXoroth
 {
+namespace
+{
+enum FleshHook : uint32
+{
+    SPELL_FLESH_HOOK_PULL = 800605,
+    SPELL_RANGE_THIRTY_YARDS = 4
+};
+}
+
 void ApplyContracts(SpellInfo* info)
 {
     if (!info || info->SpellFamilyName != 23)
         return;
     uint32 id = info->Id;
+    if (id == SPELL_FLESH_HOOK_PULL)
+    {
+        // The parent has already passed its range and hit checks before scheduling this helper.
+        // Do not roll melee avoidance again or reject an enemy that approaches during the delay.
+        // Native spell/mechanic immunities still apply to this non-damaging pull.
+        info->DmgClass = SPELL_DAMAGE_CLASS_NONE;
+        info->RangeEntry = sSpellRangeStore.LookupEntry(SPELL_RANGE_THIRTY_YARDS);
+    }
     if (id == 520440 || id == 520441)
         for (auto& effect : info->Effects)
             effect.Effect = 0; // Legacy delayed removal must not erase Demonfire generated after reservation.
