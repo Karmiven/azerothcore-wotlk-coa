@@ -244,6 +244,10 @@ void ApplyContracts(SpellInfo* info)
         aura(0,SPELL_AURA_SCHOOL_IMMUNITY,0,SPELL_SCHOOL_MASK_ALL);
         info->Effects[1].Effect = SPELL_EFFECT_DUMMY;
     }
+    // Arachnophobia and Lure ship with CasterAuraSpell pointing at the unrelated "Skulking" template
+    // spell (520890) instead of Skulk, so the native cast check always fails.
+    if (Any(info,{804970,807759}))
+        info->CasterAuraSpell = Skulk;
     if (id == 804003)
         for (uint8 slot = 0; slot < MAX_SPELL_EFFECTS; ++slot)
             dummy(slot);
