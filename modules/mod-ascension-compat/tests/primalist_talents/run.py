@@ -49,7 +49,7 @@ def main():
         rows = {}
         for offset in range(20, 20 + count * 936, 936):
             sid = struct.unpack_from("<I", raw, offset)[0]
-            if sid in {500764, 500811, 560179, 503716}:
+            if sid in {500764, 500811, 560179, 503716, 500402, 803138, 802885, *range(502769, 502778)}:
                 rows[sid] = struct.unpack_from("<234I", raw, offset)
         assert rows[500764][71] == 3 and rows[500811][71:73] == (68, 96)
         assert rows[500811][40] == rows[500764][40] == 27
@@ -57,6 +57,11 @@ def main():
         assert rows[560179][71:73] == (136, 6) and rows[560179][80] + rows[560179][74] == 30
         assert rows[560179][96] == 87 and rows[560179][111] == 1
         assert rows[503716][95:97] == (138, 47)
+        for spell_id in (500402, *range(502769, 502778)):
+            assert rows[spell_id][95] == 227 and rows[spell_id][116] == 803138
+        assert rows[803138][71:74] == (2, 0, 0) and rows[803138][208] == 37
+        assert rows[802885][72] == 30 and rows[802885][111] == 1
+        assert rows[802885][81] == 29 and rows[802885][75] == 51  # 30-80 internal Rage (3-8 visible).
     print("PASS: lethal boundary/cooldown, defense removal, owned Tremor crits, pet command gates and native helpers")
 
 

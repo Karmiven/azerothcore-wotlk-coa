@@ -12,6 +12,7 @@ using SpellEffIndex = uint8;
 // NATIVE_ENUMS
 constexpr uint32 CLASS_WILDWALKER = 31, SPELL_AURA_PERIODIC_DAMAGE = 3, EFFECT_0 = 0, SPELL_EFFECT_DUMMY = 3;
 constexpr int UNITHOOK_ON_DAMAGE = 1, UNITHOOK_ON_AURA_REMOVE = 2, ALLSPELLHOOK_ON_CRIT_CHANCE = 3;
+constexpr int ALLSPELLHOOK_ON_HIT_RESULT = 4, SPELL_MISS_NONE = 0;
 struct Unit;
 struct Player;
 struct Pet;
@@ -57,6 +58,7 @@ struct Unit
     bool IsWithinDistInMap(Unit*, float radius) const { assert(radius == 15.0f); return inRange; }
     bool IsWithinLOSInMap(Unit*) const { return los; }
     bool HasAura(uint32 id) const { return auras.contains(id); }
+    bool IsFriendlyTo(Unit* target) const { return target->friendly; }
     auto const& GetAuraEffectsByType(uint32 type) const { assert(type == 3); return periodic; }
     void CastSpell(Unit* target, uint32 id, bool triggered) { casts.emplace_back(target, id, triggered); }
 };
@@ -76,8 +78,11 @@ struct Spell
 {
     Unit* caster = nullptr;
     SpellInfo* info = nullptr;
+    std::map<uint32, uint32> values;
     Unit* GetCaster() const { return caster; }
     SpellInfo const* GetSpellInfo() const { return info; }
+    uint32 GetScriptValue(uint32 id) const { return values.contains(id) ? values.at(id) : 0; }
+    void SetScriptValue(uint32 id, uint32 value) { values[id] = value; }
 };
 struct Manager
 {
@@ -95,6 +100,7 @@ struct AllSpellScript
 {
     AllSpellScript(char const*, std::initializer_list<int>) { }
     virtual void OnSpellCritChance(Spell*, Unit*, float&) { }
+    virtual void OnSpellHitResult(Spell*, Unit*, uint8, uint32, uint32, bool) { }
 };
 struct Hook { template<class T> void operator+=(T) { } };
 struct SpellScript
@@ -120,6 +126,43 @@ int main()
     Player player;
     Unit enemy;
     enemy.guid = 2;
+    primalist_talent_casts geode;
+    SpellInfo geodeInfo;
+    geodeInfo.Id = 803138;
+    Spell stone;
+    stone.caster = &player;
+    stone.info = &geodeInfo;
+    for (uint32 tick = 0; tick < 3; ++tick)
+    {
+        stone.values.clear();
+        geode.OnSpellHitResult(&stone, &enemy, 1, 0, 0, false); // A failed tick grants nothing.
+        geode.OnSpellHitResult(&stone, &player, 0, 10, 0, false);
+        enemy.friendly = true;
+        geode.OnSpellHitResult(&stone, &enemy, 0, 10, 0, false);
+        enemy.friendly = false;
+        assert(player.casts.size() == tick);
+        geode.OnSpellHitResult(&stone, &enemy, 0, 10, 0, false);
+        geode.OnSpellHitResult(&stone, &enemy, 0, 10, 0, true);
+        assert(player.casts.size() == tick + 1);
+        assert((player.casts.back() == std::tuple<Unit*, uint32, bool>{&player, 802885, true}));
+    }
+    player.casts.clear();
+    stone.values.clear();
+    for (uint32 id : {500402u, 502770u, 802885u, 803244u})
+    {
+        geodeInfo.Id = id;
+        geode.OnSpellHitResult(&stone, &enemy, 0, 10, 0, false);
+    }
+    geodeInfo.Id = 803138;
+    geodeInfo.SpellFamilyName = 0;
+    geode.OnSpellHitResult(&stone, &enemy, 0, 10, 0, false);
+    geodeInfo.SpellFamilyName = 37;
+    player.cls = 1;
+    geode.OnSpellHitResult(&stone, &enemy, 0, 10, 0, false);
+    player.cls = CLASS_WILDWALKER;
+    stone.caster = &enemy;
+    geode.OnSpellHitResult(&stone, &enemy, 0, 10, 0, false);
+    assert(player.casts.empty());
     primalist_talent_events events;
     uint32 damage = 100;
     events.OnDamage(&enemy, &player, damage);

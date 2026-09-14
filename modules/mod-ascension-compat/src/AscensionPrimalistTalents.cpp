@@ -11,6 +11,12 @@
 
 namespace
 {
+enum PrimalistAbilitySpells : uint32
+{
+    SPELL_GEODE_BARRAGE_DAMAGE = 803138,
+    SPELL_GEODE_BARRAGE_RAGE = 802885
+};
+
 Player* Primalist(Unit* unit)
 {
     Player* player = unit ? unit->ToPlayer() : nullptr;
@@ -54,7 +60,22 @@ public:
 class primalist_talent_casts : public AllSpellScript
 {
 public:
-    primalist_talent_casts() : AllSpellScript("primalist_talent_casts", {ALLSPELLHOOK_ON_CRIT_CHANCE}) { }
+    primalist_talent_casts() : AllSpellScript("primalist_talent_casts",
+        {ALLSPELLHOOK_ON_CRIT_CHANCE, ALLSPELLHOOK_ON_HIT_RESULT}) { }
+
+    void OnSpellHitResult(Spell* spell, Unit* target, uint8 miss, uint32, uint32, bool) override
+    {
+        Player* player = Primalist(spell->GetCaster());
+        SpellInfo const* info = spell->GetSpellInfo();
+        if (!player || !target || target == player || player->IsFriendlyTo(target) || miss != SPELL_MISS_NONE ||
+            info->SpellFamilyName != 37 || info->Id != SPELL_GEODE_BARRAGE_DAMAGE ||
+            spell->GetScriptValue(SPELL_GEODE_BARRAGE_RAGE))
+            return;
+        // Each channel tick casts this damage helper. Its authored energize
+        // companion rolls 30-80 internal Rage (3-8 visible Rage) per successful stone.
+        spell->SetScriptValue(SPELL_GEODE_BARRAGE_RAGE, 1);
+        player->CastSpell(player, SPELL_GEODE_BARRAGE_RAGE, true);
+    }
 
     void OnSpellCritChance(Spell* spell, Unit* target, float& chance) override
     {
