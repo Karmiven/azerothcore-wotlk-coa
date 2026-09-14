@@ -14,6 +14,11 @@ enum AdditionalRacialSkills
     SKILL_DRAENEI_RACIAL_COA = 11760
 };
 
+enum RacialSpells
+{
+    SPELL_ARCANE_TORRENT_ALL_RESOURCES = 28730
+};
+
 struct RacialSkill
 {
     uint8 RaceId;
@@ -50,11 +55,15 @@ inline bool CanLearn(SkillLineAbilityEntry const& ability, uint8 raceId, uint8 c
     if (!raceId || GetRace(ability.SkillLine) != raceId || !IsAscensionClass(classId))
         return false;
 
-    // Only default racial grants, using the authored CoA variants rather than legacy-class fallbacks.
+    // Witch Hunter was excluded from Blood Elf class masks. The existing multi-resource
+    // Torrent restores its Mana and Rage; none of the single-resource CoA variants covers both.
+    bool const witchHunterTorrent = classId == CLASS_WITCH_HUNTER &&
+        ability.SkillLine == SKILL_RACIAL_BLOODELF && ability.Spell == SPELL_ARCANE_TORRENT_ALL_RESOURCES;
+    // Preserve the authored variants for every other race/class combination.
     return ability.AcquireMethod == SKILL_LINE_ABILITY_LEARNED_ON_SKILL_LEARN &&
         ability.MinSkillLineRank <= 1 && !ability.SupercededBySpell &&
         (!ability.RaceMask || (ability.RaceMask & (uint32(1) << (raceId - 1)))) &&
-        (!ability.ClassMask || (ability.ClassMask & (uint32(1) << (classId - 1))));
+        (witchHunterTorrent || !ability.ClassMask || (ability.ClassMask & (uint32(1) << (classId - 1))));
 }
 }
 

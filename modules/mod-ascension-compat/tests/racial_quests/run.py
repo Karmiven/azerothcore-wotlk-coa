@@ -95,6 +95,18 @@ struct Survivor
         magic, count, fields, size, _ = struct.unpack_from("<4s4I", raw)
         assert magic == b"WDBC" and fields == 234 and size == 936
         spells = {row[0]: row for row in struct.iter_unpack("<234I", raw[20:20 + count * size])}
+        # Real racial rows must grant exactly one Torrent to the formerly excluded Witch Hunter.
+        torrents = [row for row in rows if row[1] == 756 and row[2] in (28730, *range(814286, 814293))]
+        code += "uint32 witchHunterTorrents=0;\n"
+        for row in torrents:
+            values = [row[i] for i in (0, 1, 2, 3, 4, 7, 8, 9, 10, 11)]
+            code += "{SkillLineAbilityEntry torrent{" + ",".join(str(v) + "u" for v in values) + "};\n"
+            code += "if(AscensionRacialAbilities::CanLearn(torrent,RACE_BLOODELF,CLASS_WITCH_HUNTER))"
+            code += "{++witchHunterTorrents;assert(torrent.Spell==28730);}}\n"
+        code += "assert(witchHunterTorrents==1);\n"
+        assert spells[28730][117] == 828730
+        assert spells[828730][71:74] == (30, 30, 137)  # Energy, Rage and percent Mana restoration.
+        assert spells[828730][110:113] == (3, 1, 0)
         for spell_id in (814280, 814281, 814282):
             assert spells[spell_id][95] == 8  # Actual Gift variants are periodic heals.
             assert not spells[spell_id][211] & 0x80000000
@@ -116,7 +128,7 @@ struct Survivor
             flags = ["-std=c++20", "-Wall", "-Wextra", "-Werror", str(cpp), "-o", str(executable)]
         subprocess.run([compiler, *flags], cwd=out, check=True, timeout=60)
         subprocess.run([str(executable)], cwd=out, check=True, timeout=15)
-    print("PASS: racial predicates, Draenei Necromancer Gift grant, rescue admission and unrelated-spell rejection")
+    print("PASS: racial predicates, Witch Hunter Torrent, Draenei Gift and rescue admission")
 
 
 if __name__ == "__main__":
