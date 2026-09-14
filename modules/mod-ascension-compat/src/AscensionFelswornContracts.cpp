@@ -113,8 +113,12 @@ void ApplyContracts(SpellInfo* info)
         dummy(0); // preserve native radius and cooldown, select all eligible allies in the cast hook
     if (id == 800203)
         info->Effects[2].Effect = 0; // mana burn only after a successful interrupt
-    if (id == 92089)
+    if (id == BurningCommander)
+    {
         periodic(1, 3000);
+        // Player checks the authored weapon set directly; native Titan's Grip adds an unrelated damage penalty.
+        info->Effects[EFFECT_2].Effect = 0;
+    }
     if (id == 574145)
         dummy(0);
     if (id == 574150 || id == 804105 || id == 801894)

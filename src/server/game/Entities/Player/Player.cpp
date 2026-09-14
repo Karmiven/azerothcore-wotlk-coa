@@ -106,6 +106,11 @@
 //  see: https://github.com/azerothcore/azerothcore-wotlk/issues/9766
 #include "GridNotifiersImpl.h"
 
+enum CustomEquipmentSpells : uint32
+{
+    SPELL_BURNING_COMMANDER = 92089
+};
+
 enum CharacterFlags
 {
     CHARACTER_FLAG_NONE                 = 0x00000000,
@@ -3675,6 +3680,9 @@ void Player::removeSpell(uint32 spell_id, uint8 removeSpecMask, bool onlyTempora
             }
         }
     }
+
+    if (spell_id == SPELL_BURNING_COMMANDER)
+        AutoUnequipOffhandIfNeed();
 
     // pussywizard: remove from spell book (can't be replaced by previous rank, because such spells can't be unlearnt)
     if (!onlyTemporary || ((!spellInfo->HasAttribute(SpellAttr0(SPELL_ATTR0_PASSIVE | SPELL_ATTR0_DO_NOT_DISPLAY)) || !spellInfo->HasAnyAura()) && !spellInfo->HasEffect(SPELL_EFFECT_LEARN_SPELL)))
@@ -12948,13 +12956,15 @@ void Player::AutoUnequipOffhandIfNeed(bool force /*= false*/)
     }
 
     // unequip offhand weapon if player doesn't have dual wield anymore
-    if (!CanDualWield() && (offItem->GetTemplate()->InventoryType == INVTYPE_WEAPONOFFHAND || offItem->GetTemplate()->InventoryType == INVTYPE_WEAPON))
+    if (!CanDualWield() && (offItem->GetTemplate()->InventoryType == INVTYPE_WEAPONOFFHAND ||
+        offItem->GetTemplate()->InventoryType == INVTYPE_WEAPON ||
+        offItem->GetTemplate()->InventoryType == INVTYPE_2HWEAPON))
         force = true;
 
     // unequip offhand weapon if player main hand weapon is a polearm or staff or fishing pole
     if (Item* mhWeapon = GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_MAINHAND))
         if (ItemTemplate const* mhWeaponProto = mhWeapon->GetTemplate())
-            if (!CanUseTwoHandWithShield(mhWeaponProto, offItem->GetTemplate()) &&
+            if (!CanTitanGrip(mhWeaponProto) && !CanUseTwoHandWithShield(mhWeaponProto, offItem->GetTemplate()) &&
                 (mhWeaponProto->SubClass == ITEM_SUBCLASS_WEAPON_POLEARM ||
                 mhWeaponProto->SubClass == ITEM_SUBCLASS_WEAPON_STAFF ||
                 mhWeaponProto->SubClass == ITEM_SUBCLASS_WEAPON_FISHING_POLE))
@@ -12963,7 +12973,7 @@ void Player::AutoUnequipOffhandIfNeed(bool force /*= false*/)
     // need unequip offhand for 2h-weapon without TitanGrip (in any from hands)
     Item const* main = GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_MAINHAND);
     bool shieldPair = main && CanUseTwoHandWithShield(main->GetTemplate(), offItem->GetTemplate());
-    if (!force && (shieldPair || CanTitanGrip() ||
+    if (!force && (shieldPair || CanTitanGrip(offItem->GetTemplate()) ||
         (offItem->GetTemplate()->InventoryType != INVTYPE_2HWEAPON && !IsTwoHandUsed())))
     {
         UpdateTitansGrip();
@@ -13671,6 +13681,22 @@ void Player::SetCanBlock(bool value)
 void Player::SetCanTitanGrip(bool value)
 {
     m_canTitanGrip = value;
+}
+
+bool Player::HasBurningCommander() const
+{
+    return getClass() == CLASS_DEMON_HUNTER && GetLevel() >= 10 && HasActiveSpell(SPELL_BURNING_COMMANDER);
+}
+
+bool Player::CanTitanGrip(ItemTemplate const* weapon) const
+{
+    bool commander = HasBurningCommander();
+    if (!m_canTitanGrip && !commander)
+        return false;
+    return !weapon || (weapon->Class == ITEM_CLASS_WEAPON &&
+        weapon->SubClass != ITEM_SUBCLASS_WEAPON_STAFF &&
+        weapon->SubClass != ITEM_SUBCLASS_WEAPON_FISHING_POLE &&
+        (weapon->SubClass != ITEM_SUBCLASS_WEAPON_POLEARM || commander));
 }
 
 void Player::SetTemporarySpellReplacement(uint32 original, uint32 replacement)

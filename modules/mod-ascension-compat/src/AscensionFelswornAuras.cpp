@@ -101,7 +101,7 @@ class aura_ascension_felsworn_lifecycle : public AuraScript
         if (!player || !player->IsAlive())
             return;
         uint32 id = GetId();
-        if (id == 92089 && effect->GetEffIndex() == EFFECT_1)
+        if (id == BurningCommander && effect->GetEffIndex() == EFFECT_1)
         {
             PreventDefaultAction();
             Cast(player, player, 500531);
