@@ -2331,6 +2331,8 @@ public:
     std::vector<ItemSetEffect*> ItemSetEff;
 
     void SendLoot(ObjectGuid guid, LootType loot_type);
+    void LootCreatureWithCompanion(Creature* creature, float radius);
+    bool IsWithinLootDistance(Creature const* creature) const;
     void SendLootError(ObjectGuid guid, LootError error);
     void SendLootRelease(ObjectGuid guid);
     void SendNotifyLootItemRemoved(uint8 lootSlot);
@@ -2891,6 +2893,7 @@ protected:
 
     void outDebugValues() const;
     ObjectGuid m_lootGuid;
+    ObjectGuid m_companionLootGuid;
 
     TeamId m_team;
     uint32 m_nextSave; // pussywizard

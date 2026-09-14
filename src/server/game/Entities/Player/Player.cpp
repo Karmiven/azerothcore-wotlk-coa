@@ -8026,6 +8026,36 @@ void Player::SendLootRelease(ObjectGuid guid)
     SendDirectMessage(&data);
 }
 
+bool Player::IsWithinLootDistance(Creature const* creature) const
+{
+    return creature && (creature->IsWithinDistInMap(this, INTERACTION_DISTANCE) ||
+        creature->GetGUID() == m_companionLootGuid);
+}
+
+void Player::LootCreatureWithCompanion(Creature* creature, float radius)
+{
+    if (!IsAlive() || !IsInWorld() || GetLootGUID() || m_companionLootGuid || radius <= 0.0f ||
+        HasPlayerFlag(PLAYER_FLAGS_NO_PLAY_TIME) || !creature || !isAllowedToLoot(creature) ||
+        creature->loot.loot_type == LOOT_SKINNING)
+        return;
+
+    Creature* companion = GetMap()->GetCreature(GetCritterGUID());
+    if (!companion || !companion->IsAlive() || companion->GetOwnerGUID() != GetGUID() ||
+        !companion->IsWithinDistInMap(this, radius) || !companion->IsWithinDistInMap(creature, radius) ||
+        !companion->IsWithinLOSInMap(creature))
+        return;
+
+    // Only this synchronous server operation may use the companion's reach. Client loot packets
+    // keep the normal interaction distance, and no companion permission survives this call.
+    m_companionLootGuid = creature->GetGUID();
+    struct LootScope
+    {
+        ObjectGuid& Guid;
+        ~LootScope() { Guid.Clear(); }
+    } scope{m_companionLootGuid};
+    SendLoot(creature->GetGUID(), LOOT_CORPSE);
+}
+
 void Player::SendLoot(ObjectGuid guid, LootType loot_type)
 {
     if (ObjectGuid lguid = GetLootGUID())
@@ -8249,7 +8279,7 @@ void Player::SendLoot(ObjectGuid guid, LootType loot_type)
         Creature* creature = GetMap()->GetCreature(guid);
 
         // must be in range and creature must be alive for pickpocket and must be dead for another loot
-        if (!creature || creature->IsAlive() != (loot_type == LOOT_PICKPOCKETING) || !creature->IsWithinDistInMap(this, INTERACTION_DISTANCE))
+        if (!creature || creature->IsAlive() != (loot_type == LOOT_PICKPOCKETING) || !IsWithinLootDistance(creature))
         {
             SendLootRelease(guid);
             return;
@@ -8417,6 +8447,34 @@ void Player::SendLoot(ObjectGuid guid, LootType loot_type)
         data << guid;
         data << uint8(loot_type);
         data << LootView(*loot, this, permission);
+
+        if (guid == m_companionLootGuid)
+        {
+            // Consume only slots the native loot view allows to be picked up. In particular,
+            // rolled, master-looted and locked quest items must not be taken automatically.
+            data.rpos(sizeof(uint64) + sizeof(uint8)); // GUID and loot type
+            data.read_skip<uint32>(); // gold
+            uint8 count;
+            data >> count;
+            for (uint8 index = 0; index < count; ++index)
+            {
+                uint8 slot, slotType;
+                data >> slot;
+                data.read_skip(5 * sizeof(uint32)); // Native LootItem packet fields
+                data >> slotType;
+                if (slotType != LOOT_SLOT_TYPE_ALLOW_LOOT && slotType != LOOT_SLOT_TYPE_OWNER)
+                    continue;
+                sScriptMgr->OnPlayerAfterCreatureLoot(this);
+                InventoryResult result;
+                StoreLootItem(slot, loot, result);
+                if (result != EQUIP_ERR_OK)
+                    break; // Leave uncollected items on the corpse when bags are full.
+            }
+            WorldPacket money;
+            m_session->HandleLootMoneyOpcode(money);
+            m_session->DoLootRelease(guid);
+            return;
+        }
 
         SendDirectMessage(&data);
 

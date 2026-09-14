@@ -81,6 +81,7 @@
 #include <fstream>
 #include <functional>
 #include <limits>
+#include <list>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -117,6 +118,13 @@ constexpr uint32 SPELL_REAPER_SOUL_FRAGMENT = 805077;
 constexpr uint32 SPELL_REAPER_GENERATE_SOUL = 805078;
 constexpr char ASCENSION_LOCAL_RESOURCE_PREFIX[] = "ASC_LOCAL_RESOURCE";
 constexpr char ASCENSION_ACTIVE_SPEC_SETTING[] = "core.ascension_active_spec";
+
+enum CompanionLoot : uint32
+{
+    APPEARANCE_CATEGORY_COMPANION_LOOT = 38,
+    APPEARANCE_LOOT_TRANSFIGURATOR = 47520,
+    SPELL_LOOT_TRANSFIGURATOR = 84419
+};
 
 constexpr uint8 PYROMANCER_HEAT_PER_EMBER = 100;
 constexpr uint8 REAPER_SOUL_FRAGMENT_COST = 3;
@@ -249,6 +257,7 @@ struct PlayerCollectionState {
   std::vector<uint32> PendingCompanionSpells;
   std::size_t NextCompanionSpell = 0;
   uint32 CompanionSpellTimer = 0;
+  uint32 CompanionLootTimer = 0;
   bool CanSeeItemAppearances = true;
   bool CanSeeSpellAppearances = true;
 };
@@ -2294,7 +2303,35 @@ public:
 
     ProcessPendingAppearanceAdds(player, diff);
     ProcessPendingCompanionSpells(player, diff);
+    ProcessCompanionLoot(player, diff);
   }
+
+    void ProcessCompanionLoot(Player* player, uint32 diff)
+    {
+        auto state = GetState(player);
+        if (!state || state->ActiveAppearances[APPEARANCE_CATEGORY_COMPANION_LOOT] !=
+            APPEARANCE_LOOT_TRANSFIGURATOR || !state->CollectedAppearances.contains(APPEARANCE_LOOT_TRANSFIGURATOR))
+            return;
+        if (state->CompanionLootTimer > diff)
+        {
+            state->CompanionLootTimer -= diff;
+            return;
+        }
+        SpellInfo const* spell = sSpellMgr->GetSpellInfo(SPELL_LOOT_TRANSFIGURATOR);
+        if (!spell || !spell->Effects[EFFECT_0].Amplitude)
+            return;
+        state->CompanionLootTimer = spell->Effects[EFFECT_0].Amplitude;
+        Creature* companion = player->GetMap()->GetCreature(player->GetCritterGUID());
+        if (!companion || !companion->IsAlive() || companion->GetOwnerGUID() != player->GetGUID())
+            return;
+        float const radius = spell->Effects[EFFECT_0].CalcRadius(player);
+        if (radius <= 0.0f)
+            return;
+        std::list<Creature*> corpses;
+        companion->GetDeadCreatureListInGrid(corpses, radius, true);
+        for (Creature* creature : corpses)
+            player->LootCreatureWithCompanion(creature, radius);
+    }
 
     void InitializeRiding(Player* player) const
     {
